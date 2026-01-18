@@ -35,10 +35,16 @@ router.post("/contact", async (req, res) => {
                         </div> 
                     </div>`
         });
-        res.json("message sent");
+        res.status(200).json({ message: "message sent" });
 
     } catch (error) {
-        res.status(400).json(error);
+        console.error("Contact form error:", error);
+        // Return more detailed error message
+        const errorMessage = error.message || "Failed to send message";
+        res.status(400).json({ 
+            message: errorMessage,
+            error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 

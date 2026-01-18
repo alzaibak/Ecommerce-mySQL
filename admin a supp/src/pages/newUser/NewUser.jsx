@@ -1,53 +1,102 @@
 import "./newUser.css";
+import { useState } from "react";
+import { userRequest } from "../../requestMethods";
+import { useHistory } from "react-router-dom";
 
 export default function NewUser() {
+  const [inputs, setInputs] = useState({});
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const history = useHistory();
+
+  const handleChange = (e) => {
+    setInputs((prev) => {
+      return { ...prev, [e.target.name]: e.target.value };
+    });
+  };
+
+  const handleClick = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!inputs.firstName || !inputs.lastName || !inputs.email || !inputs.password) {
+      setError("Please fill all required fields");
+      return;
+    }
+
+    try {
+      await userRequest.post("/users", {
+        firstName: inputs.firstName,
+        lastName: inputs.lastName,
+        email: inputs.email,
+        password: inputs.password,
+        isAdmin: inputs.isAdmin === "true"
+      });
+      setSuccess("User created successfully!");
+      setTimeout(() => {
+        history.push("/users");
+      }, 1500);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to create user");
+    }
+  };
+
   return (
     <div className="newUser">
       <h1 className="newUserTitle">New User</h1>
       <form className="newUserForm">
         <div className="newUserItem">
-          <label>Username</label>
-          <input type="text" placeholder="john" />
+          <label>First Name *</label>
+          <input 
+            type="text" 
+            name="firstName"
+            placeholder="John" 
+            onChange={handleChange}
+          />
         </div>
         <div className="newUserItem">
-          <label>Full Name</label>
-          <input type="text" placeholder="John Smith" />
+          <label>Last Name *</label>
+          <input 
+            type="text" 
+            name="lastName"
+            placeholder="Smith" 
+            onChange={handleChange}
+          />
         </div>
         <div className="newUserItem">
-          <label>Email</label>
-          <input type="email" placeholder="john@gmail.com" />
+          <label>Email *</label>
+          <input 
+            type="email" 
+            name="email"
+            placeholder="john@gmail.com" 
+            onChange={handleChange}
+          />
         </div>
         <div className="newUserItem">
-          <label>Password</label>
-          <input type="password" placeholder="password" />
+          <label>Password *</label>
+          <input 
+            type="password" 
+            name="password"
+            placeholder="password" 
+            onChange={handleChange}
+          />
         </div>
         <div className="newUserItem">
-          <label>Phone</label>
-          <input type="text" placeholder="+1 123 456 78" />
-        </div>
-        <div className="newUserItem">
-          <label>Address</label>
-          <input type="text" placeholder="New York | USA" />
-        </div>
-        <div className="newUserItem">
-          <label>Gender</label>
-          <div className="newUserGender">
-            <input type="radio" name="gender" id="male" value="male" />
-            <label for="male">Male</label>
-            <input type="radio" name="gender" id="female" value="female" />
-            <label for="female">Female</label>
-            <input type="radio" name="gender" id="other" value="other" />
-            <label for="other">Other</label>
-          </div>
-        </div>
-        <div className="newUserItem">
-          <label>Active</label>
-          <select className="newUserSelect" name="active" id="active">
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
+          <label>Admin</label>
+          <select 
+            className="newUserSelect" 
+            name="isAdmin" 
+            id="isAdmin"
+            onChange={handleChange}
+          >
+            <option value="false">No</option>
+            <option value="true">Yes</option>
           </select>
         </div>
-        <button className="newUserButton">Create</button>
+        {error && <div style={{ color: "red", margin: "10px 0" }}>{error}</div>}
+        {success && <div style={{ color: "green", margin: "10px 0" }}>{success}</div>}
+        <button className="newUserButton" onClick={handleClick}>Create</button>
       </form>
     </div>
   );

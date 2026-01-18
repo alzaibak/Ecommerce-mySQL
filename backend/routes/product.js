@@ -54,41 +54,56 @@ const transformProducts = (products) => {
   return transformProduct(products);
 };
 
-// Create new product and add it to the database
-router.post("/", async (req, res) => {
+// Create new product and add it to the database (Admin only)
+router.post("/", tokenVerificationAndAuthorization, async (req, res) => {
     try {
-        const newAddedProduct = await Product.create(req.body);
+        // Map desc to description for database
+        const productData = { ...req.body };
+        if (productData.desc) {
+            productData.description = productData.desc;
+            delete productData.desc;
+        }
+        const newAddedProduct = await Product.create(productData);
         res.status(200).json(transformProduct(newAddedProduct));
     } catch (err) {
         res.status(500).json(err);
     }
 });
 
-// Identification admin ID at the routes and updating product
-router.put("/:id", async (req, res) => {
+// Identification admin ID at the routes and updating product (Admin only)
+router.put("/:id", tokenVerificationAndAuthorization, async (req, res) => {
     try {
-        if (req.body.password) {
-            req.body.password = CryptoJS.AES.encrypt(req.body.password, process.env.SECRET_PASSWORD).toString();
+        // Map desc to description for database
+        const productData = { ...req.body };
+        if (productData.desc) {
+            productData.description = productData.desc;
+            delete productData.desc;
         }
 
         // update product information
-        await Product.update(req.body, {
+        await Product.update(productData, {
             where: { id: req.params.id }
         });
 
         const updatedProduct = await Product.findByPk(req.params.id);
+        if (!updatedProduct) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
         res.status(200).json(transformProduct(updatedProduct));
     } catch (error) {
         res.status(500).json(error);
     }
 });
 
-// product deleting by admin
-router.delete("/:id", async (req, res) => {
+// product deleting by admin (Admin only)
+router.delete("/:id", tokenVerificationAndAuthorization, async (req, res) => {
     try {
-        await Product.destroy({
+        const deleted = await Product.destroy({
             where: { id: req.params.id }
         });
+        if (deleted === 0) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
         res.status(200).json("Your product is deleted");
     } catch (error) {
         res.status(500).json(error);
@@ -122,13 +137,25 @@ router.get("/", async (req, res) => {
                 limit: 5
             });
         } else if (queryCategory) {
-            // For JSON column, use JSON_CONTAINS in MySQL
-            allProducts = await Product.findAll({
-                where: Sequelize.where(
-                    Sequelize.fn('JSON_CONTAINS', Sequelize.col('categories'), JSON.stringify(queryCategory)),
-                    1
-                )
-            });
+            // For JSON column, use JSON_CONTAINS in MySQL or filter in JavaScript
+            try {
+                allProducts = await Product.findAll({
+                    where: Sequelize.where(
+                        Sequelize.fn('JSON_CONTAINS', Sequelize.col('categories'), JSON.stringify(queryCategory)),
+                        1
+                    )
+                });
+            } catch (err) {
+                // Fallback: get all and filter in JavaScript
+                const all = await Product.findAll();
+                allProducts = all.filter(product => {
+                    if (!product.categories) return false;
+                    const cats = Array.isArray(product.categories) 
+                        ? product.categories 
+                        : JSON.parse(product.categories || "[]");
+                    return cats.includes(queryCategory);
+                });
+            }
         } else {
             allProducts = await Product.findAll();
         }

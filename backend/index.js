@@ -13,6 +13,7 @@ const orderRoute = require("./routes/order");
 const authenticationUser = require("./routes/authentication");
 const stripe = require("./routes/stripe");
 const contact = require("./routes/contact");
+const category = require("./routes/category");
 
 dotenv.config();
 
@@ -43,6 +44,7 @@ app.use("/api/cart", cartRoute);
 app.use("/api/orders", orderRoute);
 app.use("/api/stripe", stripe);
 app.use("/api/", contact);
+app.use("/api/categories", category);
 
 // Server connection
 app.listen(process.env.PORT || 5000, () => {

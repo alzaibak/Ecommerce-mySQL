@@ -16,16 +16,16 @@ router.post("/", async (req, res) => {
 });
 
 // changing order by admin only
-router.put("/:id", async (req, res) => {
+router.put("/:id", tokenVerificationAndAuthorization, async (req, res) => {
     try {
-        if (req.body.password) {
-            req.body.password = CryptoJS.AES.encrypt(req.body.password, process.env.SECRET_PASSWORD).toString();
-        }
-
         // update order
-        await Order.update(req.body, {
+        const [updated] = await Order.update(req.body, {
             where: { id: req.params.id }
         });
+
+        if (updated === 0) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
 
         const updatedOrder = await Order.findByPk(req.params.id);
         res.status(200).json(updatedOrder);
@@ -59,9 +59,11 @@ router.get("/find/:userId", tokenVerificationAndAuthorization, async (req, res) 
 });
 
 // Get all orders by admin only
-router.get("/", async (req, res) => {
+router.get("/", tokenVerificationAndAuthorization, async (req, res) => {
     try {
-        const orders = await Order.findAll();
+        const orders = await Order.findAll({
+            order: [['createdAt', 'DESC']]
+        });
         res.status(200).json(orders);
     } catch (err) {
         res.status(500).json(err);

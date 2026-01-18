@@ -131,30 +131,51 @@ const ContactForm = () => {
   const [email,setEmail]= useState('');
   const [message,setMessage]= useState('');
 
-  const handleSubmit = ()=>{
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     
-   if (name ===''||object ===''||email===''||message ==='') {
-    document.getElementById("err").innerText = "veiller remplier les chambre vide";
-    } else{
-      document.getElementById("err").innerText = "";
-      try {
-        publicURL.post('/contact',{
-          name: name,
-          subject: object,
-          email: email,
-          message: message,
-        }).then((res)=>{
-          if (res.status === 200) {
-            document.getElementById("success").innerText = "votre message a été bien envoyer";
-            document.getElementById("err").innerText = "";
-          }
-       }).catch(()=>document.getElementById("err").innerText = "Un problème est survenu. veuillez vérifier votre mail ou réessayer plus tard",
-       document.getElementById("success").innerText = ""
+    if (name === '' || object === '' || email === '' || message === '') {
+      const errEl = document.getElementById("err");
+      if (errEl) errEl.innerText = "Veuillez remplir tous les champs";
+      return;
+    }
 
-       )
-      } catch (error) {
-        console.log(error);
+    const errEl = document.getElementById("err");
+    const successEl = document.getElementById("success");
+    
+    if (errEl) errEl.innerText = "";
+    if (successEl) successEl.innerText = "";
+
+    try {
+      const res = await publicURL.post('/contact', {
+        name: name,
+        subject: object,
+        email: email,
+        message: message,
+      });
+      
+      if (res.status === 200 || res.data?.message === "message sent" || res.data === "message sent") {
+        if (successEl) {
+          successEl.innerText = "Votre message a été bien envoyé";
+        }
+        if (errEl) errEl.innerText = "";
+        // Reset form
+        setName('');
+        setObject('');
+        setEmail('');
+        setMessage('');
+      } else {
+        if (errEl) {
+          errEl.innerText = "Réponse inattendue du serveur";
+        }
       }
+    } catch (error) {
+      console.error("Contact form error:", error);
+      if (errEl) {
+        errEl.innerText = error.response?.data?.message || 
+          "Un problème est survenu. Veuillez vérifier votre mail ou réessayer plus tard";
+      }
+      if (successEl) successEl.innerText = "";
     }
   }
 
@@ -166,17 +187,40 @@ const ContactForm = () => {
             <CompanyEmail> <b> Email:</b>forhappydays@gmail.com </CompanyEmail>
             <Phone><b>Telephone:</b>0589745956</Phone>
             <Form>
-                <FirstLine>
-                  <Input placeholder='Nom' onChange={(e)=>setName(e.target.value)}></Input>
-                  <Input placeholder='object' onChange={(e)=>setObject(e.target.value)}></Input>
-                </FirstLine>
-                <SecondLine>
-                  <Email placeholder='Email' onChange={(e)=>setEmail(e.target.value)}></Email>
-                  <Message placeholder='Message' onChange={(e)=>setMessage(e.target.value)}></Message>
-                </SecondLine>
-                <Error id ="err"></Error>
-                <Success id ="success"></Success>
-                <Submit onClick={handleSubmit}>Soumettre</Submit>
+                <form onSubmit={handleSubmit}>
+                  <FirstLine>
+                    <Input 
+                      placeholder='Nom' 
+                      value={name}
+                      onChange={(e)=>setName(e.target.value)}
+                      required
+                    />
+                    <Input 
+                      placeholder='Object' 
+                      value={object}
+                      onChange={(e)=>setObject(e.target.value)}
+                      required
+                    />
+                  </FirstLine>
+                  <SecondLine>
+                    <Email 
+                      type="email"
+                      placeholder='Email' 
+                      value={email}
+                      onChange={(e)=>setEmail(e.target.value)}
+                      required
+                    />
+                    <Message 
+                      placeholder='Message' 
+                      value={message}
+                      onChange={(e)=>setMessage(e.target.value)}
+                      required
+                    />
+                  </SecondLine>
+                  <Error id ="err"></Error>
+                  <Success id ="success"></Success>
+                  <Submit type="submit">Soumettre</Submit>
+                </form>
             </Form>
         </LeftSection>
         <RightSection>

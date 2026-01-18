@@ -1,8 +1,14 @@
 .container{
     display: flex;
     margin-top: 10px;
+    width: 100%;
 }
 
+.mainContent {
+    flex: 1;
+    padding: 0 20px;
+    min-width: 0; /* Allows flex item to shrink */
+}
 
 .link{
     text-decoration: none;

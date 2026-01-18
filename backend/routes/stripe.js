@@ -10,22 +10,34 @@ let productsData; // Store products data for webhook
 // Stripe payment API
 router.post('/create-checkout-session', async (req, res) => {
     try {
+        if (!req.body.cartItems || req.body.cartItems.length === 0) {
+            return res.status(400).json({ message: 'Cart is empty' });
+        }
+
+        console.log("Received cart items:", req.body.cartItems);
         productsData = JSON.stringify(req.body.cartItems);
         
         const customer = await stripe.customers.create({});
 
         const line_items = req.body.cartItems.map(item => {
+            const price = parseFloat(item.price) || 0;
+            const quantity = parseInt(item.quantity) || 1;
+            
+            if (price <= 0) {
+                throw new Error(`Invalid price for item: ${item.title}`);
+            }
+
             return {
                 price_data: {
                     currency: 'EUR',
                     product_data: {
-                        name: `${item.title} , ${item.color} , ${item.size}`,
-                        description: item.dec,
-                        images: [item.img],
+                        name: `${item.title || 'Product'}${item.color ? ` - ${item.color}` : ''}${item.size ? ` - ${item.size}` : ''}`,
+                        description: (item.desc || item.description || '').substring(0, 200),
+                        images: item.img ? [item.img] : [],
                     },
-                    unit_amount: item.price * 100,
+                    unit_amount: Math.round(price * 100),
                 },
-                quantity: item.quantity,
+                quantity: quantity,
             };
         });
 
@@ -67,16 +79,38 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     const data = event.data.object;
 
     // Handle the event
-    if (event.type === "payment_intent.succeeded") {
+    if (event.type === "checkout.session.completed") {
         // Create order on database
+        try {
+            const session = await stripe.checkout.sessions.retrieve(data.id, {
+                expand: ['line_items', 'customer']
+            });
+            
+            const items = JSON.parse(productsData);
+            const amount = session.amount_total / 100;
+            
+            const newOrder = await Order.create({
+                customerId: session.customer,
+                paymentIntentId: session.payment_intent,
+                products: items,
+                amount: amount,
+                address: session.shipping_details || null,
+                status: 'pending'
+            });
+            console.log("Order created:", newOrder.id);
+        } catch (err) {
+            console.log("Error creating order:", err);
+        }
+    } else if (event.type === "payment_intent.succeeded") {
+        // Fallback for payment_intent.succeeded
         try {
             const items = JSON.parse(productsData);
             const newOrder = await Order.create({
                 customerId: data.customer,
-                paymentIntentId: data.payment_intent,
+                paymentIntentId: data.id,
                 products: items,
                 amount: data.amount / 100,
-                address: data.shipping,
+                address: data.shipping || null,
                 status: 'pending'
             });
             console.log("Order created:", newOrder.id);

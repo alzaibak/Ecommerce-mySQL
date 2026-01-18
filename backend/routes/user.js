@@ -3,7 +3,7 @@ const User = require("../models/User");
 const CryptoJS = require("crypto-js");
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
-const { tokenVerificationAndAuthorization } = require("./tokenVerification");
+const { tokenVerificationAndAuthorization, verifyAdmin } = require("./tokenVerification");
 
 // Identification of users by using ID in the routes and updating his information
 router.put("/:id", tokenVerificationAndAuthorization, async (req, res) => {
@@ -24,13 +24,16 @@ router.put("/:id", tokenVerificationAndAuthorization, async (req, res) => {
     }
 });
 
-// User account deleting
+// User account deleting (Admin only)
 router.delete("/:id", tokenVerificationAndAuthorization, async (req, res) => {
     try {
-        await User.destroy({
+        const deleted = await User.destroy({
             where: { id: req.params.id }
         });
-        res.status(200).json("Your account is deleted");
+        if (deleted === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        res.status(200).json("User account is deleted");
     } catch (error) {
         res.status(500).json(error);
     }

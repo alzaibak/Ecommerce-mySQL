@@ -23,16 +23,31 @@ const AllProducts = ({cat,filters,sort}) => {
  const [fetchProducts, setProducts] = useState([]);
  const [filteredProducts, setFilteredProducts] = useState(fetchProducts);
  const count = filteredProducts.length;
- // getting products by category using useEffect function
+  // getting products by category using useEffect function
  useEffect(()=>{
     const getProducts = async ()=>{
       try {
         const res = await axios.get(
           cat
-          ? `http://localhost:5000/api/products/?category=${cat}`
-          : `http://localhost:5000/api/products/`);
-            setProducts(res.data);
+          ? `http://localhost:5000/api/products?category=${cat}`
+          : `http://localhost:5000/api/products`);
+        const allProducts = res.data;
+        
+        // Filter by category if category is provided
+        if (cat) {
+          const filtered = allProducts.filter(product => {
+            if (!product.categories) return false;
+            const cats = Array.isArray(product.categories) 
+              ? product.categories 
+              : JSON.parse(product.categories || "[]");
+            return cats.includes(cat);
+          });
+          setProducts(filtered);
+        } else {
+          setProducts(allProducts);
+        }
       } catch (error) {
+        console.error("Error fetching products:", error);
       }
      
     }

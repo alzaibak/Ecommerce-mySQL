@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./newProduct.css";
 import {
   getStorage,
@@ -9,12 +9,27 @@ import {
 import app from "../../firebase";
 import { addProduct } from "../../redux/apiCalls";
 import { useDispatch } from "react-redux";
+import { publicRequest } from "../../requestMethods";
 
 export default function NewProduct() {
   const [inputs, setInputs] = useState({});
   const [file, setFile] = useState(null);
   const [cat, setCat] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState([]);
   const dispatch = useDispatch();
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await publicRequest.get("/categories");
+        setCategories(res.data);
+      } catch (err) {
+        console.error("Error fetching categories:", err);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   const handleChange = (e) => {
     setInputs((prev) => {
@@ -22,11 +37,37 @@ export default function NewProduct() {
     });
   };
   const handleCat = (e) => {
-    setCat(e.target.value.split(","));
+    const value = e.target.value;
+    if (value.includes(",")) {
+      // Legacy comma-separated input
+      setCat(value.split(",").map(c => c.trim()));
+      setSelectedCategories([]);
+    } else {
+      // Single category selection
+      setCat([value]);
+      setSelectedCategories([value]);
+    }
+  };
+
+  const handleCategorySelect = (e) => {
+    const categoryIds = Array.from(e.target.selectedOptions, option => option.value);
+    setSelectedCategories(categoryIds);
+    setCat(categoryIds);
   };
 
   const handleClick = (e) => {
     e.preventDefault();
+    
+    if (!file) {
+      alert("Please select an image file");
+      return;
+    }
+
+    if (!inputs.title || !inputs.price) {
+      alert("Please fill in title and price");
+      return;
+    }
+
     const fileName = new Date().getTime() + file.name;
     const storage = getStorage(app);
     const storageRef = ref(storage, fileName);
@@ -60,9 +101,26 @@ export default function NewProduct() {
       () => {
         // Handle successful uploads on complete
         // For instance, get the download URL: https://firebasestorage.googleapis.com/...
-        getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-          const product = { ...inputs, img: downloadURL, categories: cat };
-          addProduct(product, dispatch);
+        getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
+          const product = { 
+            ...inputs, 
+            img: downloadURL, 
+            categories: cat.length > 0 ? cat : []
+          };
+          try {
+            await addProduct(product, dispatch);
+            // Reset form after successful creation
+            setInputs({});
+            setFile(null);
+            setCat([]);
+            setSelectedCategories([]);
+            window.location.href = "/products";
+          } catch (error) {
+            console.error("Error adding product:", error);
+          }
+        }).catch((error) => {
+          console.error("Error getting download URL:", error);
+          alert("Failed to get image URL");
         });
       }
     );
@@ -109,7 +167,30 @@ export default function NewProduct() {
         </div>
         <div className="addProductItem">
           <label>Categories</label>
-          <input type="text" placeholder="jeans,skirts" onChange={handleCat} />
+          {categories.length > 0 ? (
+            <select 
+              multiple 
+              onChange={handleCategorySelect}
+              style={{ padding: "10px", minHeight: "100px" }}
+            >
+              {categories.map((category) => (
+                <option key={category.id} value={category.name}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input 
+              type="text" 
+              placeholder="jeans,skirts (comma-separated)" 
+              onChange={handleCat} 
+            />
+          )}
+          <small style={{ color: "#666", marginTop: "5px", display: "block" }}>
+            {categories.length > 0 
+              ? "Hold Ctrl/Cmd to select multiple categories" 
+              : "Enter categories separated by commas"}
+          </small>
         </div>
         <div className="addProductItem">
           <label>Stock</label>

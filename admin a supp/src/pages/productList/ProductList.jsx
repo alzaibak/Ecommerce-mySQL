@@ -14,8 +14,12 @@ export default function ProductList() {
     getProducts(dispatch);
   }, [dispatch]);
 
-  const handleDelete = (id) => {
-    deleteProduct(id, dispatch);
+  const handleDelete = async (id) => {
+    if (window.confirm("Are you sure you want to delete this product?")) {
+      await deleteProduct(id, dispatch);
+      // Refresh products list
+      getProducts(dispatch);
+    }
   };
 
   const columns = [
