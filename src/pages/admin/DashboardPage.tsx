@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { usersAPI, ordersAPI, productsAPI } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Package, ShoppingCart, DollarSign, TrendingUp, TrendingDown } from 'lucide-react';
+import { Users, Package, ShoppingCart, DollarSign } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { usersAPI, productsAPI, ordersAPI } from '@/lib/api';
 
 interface Stats {
   totalUsers: number;
@@ -27,21 +27,35 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [users, products, orders, income] = await Promise.all([
-          usersAPI.getAll(),
-          productsAPI.getAll(),
-          ordersAPI.getAll(),
-          ordersAPI.getIncome(),
+        const [usersRes, productsRes, ordersRes] = await Promise.all([
+          usersAPI.getAll().catch(() => []),
+          productsAPI.getAll().catch(() => []),
+          ordersAPI.getAll().catch(() => []),
         ]);
 
-        const totalRevenue = orders.reduce((sum: number, order: { amount: number }) => sum + order.amount, 0);
-        
-        // Format monthly income data
+        const users = Array.isArray(usersRes) ? usersRes : [];
+        const products = Array.isArray(productsRes) ? productsRes : [];
+        const orders = Array.isArray(ordersRes) ? ordersRes : [];
+
+        // Calculate total revenue
+        const totalRevenue = orders.reduce((sum: number, order: any) => sum + (order.amount || 0), 0);
+
+        // Group orders by month for chart
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const monthlyIncome = income.map((item: { _id: number; total: number }) => ({
-          month: monthNames[item._id - 1] || `Month ${item._id}`,
-          total: item.total,
-        }));
+        const monthlyData = new Map<number, number>();
+        
+        orders.forEach((order: any) => {
+          const date = new Date(order.createdAt);
+          const month = date.getMonth();
+          monthlyData.set(month, (monthlyData.get(month) || 0) + Number(order.amount));
+        });
+
+        const monthlyIncome = Array.from(monthlyData.entries())
+          .map(([month, total]) => ({
+            month: monthNames[month],
+            total,
+          }))
+          .sort((a, b) => monthNames.indexOf(a.month) - monthNames.indexOf(b.month));
 
         setStats({
           totalUsers: users.length,
@@ -87,7 +101,7 @@ export default function DashboardPage() {
       bgColor: 'bg-orange-500/10',
     },
     {
-      title: 'Total Revenue',
+      title: 'Revenue',
       value: `$${stats.totalRevenue.toLocaleString()}`,
       icon: DollarSign,
       color: 'text-purple-500',
@@ -138,22 +152,28 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.monthlyIncome}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" className="text-muted-foreground" />
-                  <YAxis className="text-muted-foreground" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                    formatter={(value: number) => [`$${value.toLocaleString()}`, 'Revenue']}
-                  />
-                  <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {stats.monthlyIncome.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.monthlyIncome}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" className="text-muted-foreground" />
+                    <YAxis className="text-muted-foreground" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                      }}
+                      formatter={(value: number) => [`$${value.toLocaleString()}`, 'Revenue']}
+                    />
+                    <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No sales data yet
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -165,28 +185,34 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={stats.monthlyIncome}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" className="text-muted-foreground" />
-                  <YAxis className="text-muted-foreground" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                    formatter={(value: number) => [`$${value.toLocaleString()}`, 'Revenue']}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="total"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--primary))' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {stats.monthlyIncome.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={stats.monthlyIncome}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" className="text-muted-foreground" />
+                    <YAxis className="text-muted-foreground" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                      }}
+                      formatter={(value: number) => [`$${value.toLocaleString()}`, 'Revenue']}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="total"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--primary))' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No sales data yet
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

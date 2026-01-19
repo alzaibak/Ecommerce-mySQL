@@ -1,4 +1,4 @@
-import { NavLink } from '@/components/NavLink';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Sidebar,
@@ -18,19 +18,28 @@ import {
   Package, 
   ShoppingCart, 
   LogOut,
-  Settings
+  Settings,
+  FolderOpen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const menuItems = [
-  { title: 'Dashboard', url: '/admin', icon: LayoutDashboard },
-  { title: 'Users', url: '/admin/users', icon: Users },
-  { title: 'Products', url: '/admin/products', icon: Package },
-  { title: 'Orders', url: '/admin/orders', icon: ShoppingCart },
+  { title: 'Dashboard', path: '/admin', icon: LayoutDashboard },
+  { title: 'Categories', path: '/admin/categories', icon: FolderOpen },
+  { title: 'Products', path: '/admin/products', icon: Package },
+  { title: 'Orders', path: '/admin/orders', icon: ShoppingCart },
+  { title: 'Users', path: '/admin/users', icon: Users },
 ];
 
 export function AdminSidebar() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/admin/login');
+  };
 
   return (
     <Sidebar className="border-r border-border">
@@ -52,17 +61,14 @@ export function AdminSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === '/admin'}
-                      className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-colors"
-                      activeClassName="bg-accent text-accent-foreground font-medium"
-                    >
-                      <item.icon className="w-4 h-4" />
-                      <span>{item.title}</span>
-                    </NavLink>
+                <SidebarMenuItem key={item.path}>
+                  <SidebarMenuButton
+                    onClick={() => navigate(item.path)}
+                    isActive={location.pathname === item.path}
+                    className="w-full"
+                  >
+                    <item.icon className="w-4 h-4" />
+                    <span>{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -89,7 +95,7 @@ export function AdminSidebar() {
           variant="outline"
           size="sm"
           className="w-full"
-          onClick={logout}
+          onClick={handleLogout}
         >
           <LogOut className="w-4 h-4 mr-2" />
           Logout

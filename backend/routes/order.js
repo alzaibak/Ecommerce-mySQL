@@ -3,7 +3,7 @@ const Order = require("../models/Order");
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
 const CryptoJS = require("crypto-js");
-const { tokenVerification, tokenVerificationAndAuthorization } = require("./tokenVerification");
+const { tokenVerificationAndAdmin, tokenVerificationAndAuthorization } = require("./tokenVerification");
 
 // add new order to the database
 router.post("/", async (req, res) => {
@@ -16,7 +16,7 @@ router.post("/", async (req, res) => {
 });
 
 // changing order by admin only
-router.put("/:id", tokenVerificationAndAuthorization, async (req, res) => {
+router.put("/:id", tokenVerificationAndAdmin, async (req, res) => {
     try {
         // update order
         const [updated] = await Order.update(req.body, {
@@ -35,7 +35,7 @@ router.put("/:id", tokenVerificationAndAuthorization, async (req, res) => {
 });
 
 // order deleting by admin only
-router.delete("/:id", async (req, res) => {
+router.delete("/:id",tokenVerificationAndAdmin,  async (req, res) => {
     try {
         await Order.destroy({
             where: { id: req.params.id }
@@ -59,7 +59,7 @@ router.get("/find/:userId", tokenVerificationAndAuthorization, async (req, res) 
 });
 
 // Get all orders by admin only
-router.get("/", tokenVerificationAndAuthorization, async (req, res) => {
+router.get("/", tokenVerificationAndAdmin, async (req, res) => {
     try {
         const orders = await Order.findAll({
             order: [['createdAt', 'DESC']]
@@ -71,7 +71,7 @@ router.get("/", tokenVerificationAndAuthorization, async (req, res) => {
 });
 
 // get monthly income by admin only
-router.get("/income", async (req, res) => {
+router.get("/income",tokenVerificationAndAdmin, async (req, res) => {
     const todayDate = new Date();
     const lastMonth = new Date(todayDate.setMonth(todayDate.getMonth() - 1));
 

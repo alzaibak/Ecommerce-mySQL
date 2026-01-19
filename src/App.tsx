@@ -23,6 +23,8 @@ import ProductsAdminPage from "@/pages/admin/ProductsPage";
 import OrdersPage from "@/pages/admin/OrdersPage";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import NotFound from "./pages/NotFound";
+import SuccessPaymentPage from "./pages/client/SuccessPaymentPage";
+import CategoriesPage from "./pages/admin/CategoriesPage";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +44,7 @@ const App = () => (
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/cart" element={<CartPage />} />
+            <Route path="/successPayment" element={<SuccessPaymentPage />} />
             <Route path="/login" element={<LoginFormPage />} />
             <Route path="/signup" element={<SignupPage />} />
             
@@ -65,6 +68,11 @@ const App = () => (
             <Route path="/admin/orders" element={
               <ProtectedRoute>
                 <OrdersPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/categories" element={
+              <ProtectedRoute>
+                <CategoriesPage />
               </ProtectedRoute>
             } />
             

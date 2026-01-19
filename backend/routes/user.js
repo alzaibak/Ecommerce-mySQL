@@ -3,7 +3,7 @@ const User = require("../models/User");
 const CryptoJS = require("crypto-js");
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
-const { tokenVerificationAndAuthorization, verifyAdmin } = require("./tokenVerification");
+const { tokenVerificationAndAuthorization, verifyAdmin,tokenVerificationAndAdmin } = require("./tokenVerification");
 
 // Identification of users by using ID in the routes and updating his information
 router.put("/:id", tokenVerificationAndAuthorization, async (req, res) => {
@@ -25,7 +25,7 @@ router.put("/:id", tokenVerificationAndAuthorization, async (req, res) => {
 });
 
 // User account deleting (Admin only)
-router.delete("/:id", tokenVerificationAndAuthorization, async (req, res) => {
+router.delete("/:id", tokenVerificationAndAdmin, async (req, res) => {
     try {
         const deleted = await User.destroy({
             where: { id: req.params.id }
@@ -40,7 +40,7 @@ router.delete("/:id", tokenVerificationAndAuthorization, async (req, res) => {
 });
 
 // Get one user information by Admin only
-router.get("/find/:id", tokenVerificationAndAuthorization, async (req, res) => {
+router.get("/find/:id", tokenVerificationAndAdmin, async (req, res) => {
     try {
         const userInfo = await User.findByPk(req.params.id);
         if (userInfo && userInfo.isAdmin === true) {
@@ -55,7 +55,7 @@ router.get("/find/:id", tokenVerificationAndAuthorization, async (req, res) => {
 });
 
 // Get all users information by Admin only
-router.get("/", async (req, res) => {
+router.get("/", tokenVerificationAndAdmin, async (req, res) => {
     const newQuery = req.query.new;
     try {
         let users;

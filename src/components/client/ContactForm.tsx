@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import api from '@/lib/api';
+import {contactAPI} from '@/lib/api';
 
 const ContactForm = () => {
   const { toast } = useToast();
@@ -38,7 +38,7 @@ const ContactForm = () => {
 
     setLoading(true);
     try {
-      await api.post('/contact', formData);
+      await contactAPI.create(formData);
       toast({
         title: 'Succès',
         description: 'Votre message a été envoyé avec succès',

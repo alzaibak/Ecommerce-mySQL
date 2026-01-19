@@ -19,22 +19,25 @@ interface PayButtonProps {
 const PayButton = ({ cartItems, disabled }: PayButtonProps) => {
   const [loading, setLoading] = useState(false);
 
-  const handlePayment = async () => {
-    setLoading(true);
-    try {
-      const response = await api.post('/stripe/create-checkout-session', {
-        cartItems,
-      });
-      
-      if (response.data.url) {
-        window.location.href = response.data.url;
-      }
-    } catch (error) {
-      console.error('Payment error:', error);
-    } finally {
-      setLoading(false);
+const handlePayment = async () => {
+  setLoading(true);
+  try {
+    // Call backend
+    const data = await api.post('/stripe/create-checkout-session', { cartItems });
+
+    // 'data' should already be the parsed JSON
+    if (data?.url) {
+      window.location.href = data.url;
+    } else {
+      console.error('Stripe session URL missing', data);
     }
-  };
+  } catch (error) {
+    console.error('Payment error:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="space-y-3">

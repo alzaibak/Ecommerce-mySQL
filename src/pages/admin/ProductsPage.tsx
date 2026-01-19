@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { productsAPI } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +20,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -33,59 +31,51 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Plus, Search, Trash2, Edit, Package } from 'lucide-react';
+import { productsAPI } from '@/lib/api';
 
 interface Product {
-  id: number;
+  _id: string;
   title: string;
-  description: string;
-  image: string;
-  categories: string[];
-  size: string[];
-  color: string[];
+  desc?: string;
   price: number;
-  inStock: boolean;
-  createdAt: string;
+  img?: string;
+  categories?: string[];
+  size?: string[];
+  color?: string[];
+  discount?: number;
+  inStock?: boolean;
+  createdAt?: string;
 }
-
-const CATEGORIES = ['Electronics', 'Clothing', 'Home', 'Sports', 'Books', 'Toys'];
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [stockFilter, setStockFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [deleteProductId, setDeleteProductId] = useState<number | null>(null);
+  const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
     title: '',
-    description: '',
-    image: '',
-    categories: '',
-    size: '',
-    color: '',
+    desc: '',
+    img: '',
+    sizes: '',
+    colors: '',
     price: '',
+    discount: '',
     inStock: true,
   });
 
   const fetchProducts = async () => {
     try {
-      const data = await productsAPI.getAll();
+      const response = await productsAPI.getAll();
+      const data = Array.isArray(response) ? response : [];
       setProducts(data);
       setFilteredProducts(data);
     } catch (error) {
@@ -104,41 +94,24 @@ export default function ProductsPage() {
   }, []);
 
   useEffect(() => {
-    let filtered = products;
-
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (product) =>
-          product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          product.description.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    if (categoryFilter !== 'all') {
-      filtered = filtered.filter((product) =>
-        product.categories?.includes(categoryFilter)
-      );
-    }
-
-    if (stockFilter !== 'all') {
-      filtered = filtered.filter((product) =>
-        stockFilter === 'inStock' ? product.inStock : !product.inStock
-      );
-    }
-
+    const filtered = products.filter(
+      (product) =>
+        product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.desc?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
     setFilteredProducts(filtered);
-  }, [searchTerm, categoryFilter, stockFilter, products]);
+  }, [searchTerm, products]);
 
   const openAddDialog = () => {
     setEditingProduct(null);
     setFormData({
       title: '',
-      description: '',
-      image: '',
-      categories: '',
-      size: '',
-      color: '',
+      desc: '',
+      img: '',
+      sizes: '',
+      colors: '',
       price: '',
+      discount: '',
       inStock: true,
     });
     setIsDialogOpen(true);
@@ -148,13 +121,13 @@ export default function ProductsPage() {
     setEditingProduct(product);
     setFormData({
       title: product.title,
-      description: product.description,
-      image: product.image,
-      categories: product.categories?.join(', ') || '',
-      size: product.size?.join(', ') || '',
-      color: product.color?.join(', ') || '',
+      desc: product.desc || '',
+      img: product.img || '',
+      sizes: product.size?.join(', ') || '',
+      colors: product.color?.join(', ') || '',
       price: product.price.toString(),
-      inStock: product.inStock,
+      discount: product.discount?.toString() || '',
+      inStock: product.inStock ?? true,
     });
     setIsDialogOpen(true);
   };
@@ -165,18 +138,18 @@ export default function ProductsPage() {
 
     const productData = {
       title: formData.title,
-      description: formData.description,
-      image: formData.image,
-      categories: formData.categories.split(',').map((c) => c.trim()).filter(Boolean),
-      size: formData.size.split(',').map((s) => s.trim()).filter(Boolean),
-      color: formData.color.split(',').map((c) => c.trim()).filter(Boolean),
+      desc: formData.desc || null,
+      img: formData.img || null,
+      size: formData.sizes.split(',').map((s) => s.trim()).filter(Boolean),
+      color: formData.colors.split(',').map((c) => c.trim()).filter(Boolean),
       price: parseFloat(formData.price),
+      discount: formData.discount ? parseInt(formData.discount) : null,
       inStock: formData.inStock,
     };
 
     try {
       if (editingProduct) {
-        await productsAPI.update(editingProduct.id, productData);
+        await productsAPI.update(parseInt(editingProduct._id), productData);
         toast({
           title: 'Product updated',
           description: 'Product has been updated successfully',
@@ -205,38 +178,17 @@ export default function ProductsPage() {
     if (!deleteProductId) return;
 
     try {
-      await productsAPI.delete(deleteProductId);
+      await productsAPI.delete(parseInt(deleteProductId));
       toast({
         title: 'Product deleted',
         description: 'Product has been removed successfully',
       });
-      setProducts(products.filter((p) => p.id !== deleteProductId));
+      setProducts(products.filter((p) => p._id !== deleteProductId));
       setDeleteProductId(null);
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to delete product',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const toggleStock = async (product: Product) => {
-    try {
-      await productsAPI.update(product.id, { inStock: !product.inStock });
-      setProducts(
-        products.map((p) =>
-          p.id === product.id ? { ...p, inStock: !p.inStock } : p
-        )
-      );
-      toast({
-        title: 'Stock updated',
-        description: `Product marked as ${!product.inStock ? 'available' : 'unavailable'}`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update stock status',
         variant: 'destructive',
       });
     }
@@ -265,8 +217,8 @@ export default function ProductsPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="relative flex-1 min-w-[200px]">
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search products..."
@@ -275,29 +227,6 @@ export default function ProductsPage() {
                 className="pl-10"
               />
             </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {CATEGORIES.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={stockFilter} onValueChange={setStockFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Stock" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Stock</SelectItem>
-                <SelectItem value="inStock">In Stock</SelectItem>
-                <SelectItem value="outOfStock">Out of Stock</SelectItem>
-              </SelectContent>
-            </Select>
             <Badge variant="secondary">{filteredProducts.length} products</Badge>
           </div>
         </CardHeader>
@@ -308,18 +237,17 @@ export default function ProductsPage() {
                 <TableHead>Image</TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Price</TableHead>
-                <TableHead>Categories</TableHead>
                 <TableHead>Stock</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredProducts.map((product) => (
-                <TableRow key={product.id}>
+                <TableRow key={product._id}>
                   <TableCell>
-                    {product.image ? (
+                    {product.img ? (
                       <img
-                        src={product.image}
+                        src={product.img}
                         alt={product.title}
                         className="w-12 h-12 object-cover rounded"
                       />
@@ -332,21 +260,18 @@ export default function ProductsPage() {
                   <TableCell className="font-medium max-w-[200px] truncate">
                     {product.title}
                   </TableCell>
-                  <TableCell>${product.price.toFixed(2)}</TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {product.categories?.slice(0, 2).map((cat) => (
-                        <Badge key={cat} variant="outline" className="text-xs">
-                          {cat}
-                        </Badge>
-                      ))}
-                    </div>
+                    ${Number(product.price).toFixed(2)}
+                    {product.discount && product.discount > 0 && (
+                      <Badge variant="destructive" className="ml-2 text-xs">
+                        -{product.discount}%
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
-                    <Switch
-                      checked={product.inStock}
-                      onCheckedChange={() => toggleStock(product)}
-                    />
+                    <Badge variant={product.inStock ? 'default' : 'secondary'}>
+                      {product.inStock ? 'In Stock' : 'Out of Stock'}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
@@ -360,7 +285,7 @@ export default function ProductsPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setDeleteProductId(product.id)}
+                        onClick={() => setDeleteProductId(product._id)}
                       >
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
@@ -375,7 +300,7 @@ export default function ProductsPage() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
             <DialogDescription>
@@ -393,20 +318,20 @@ export default function ProductsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="desc">Description</Label>
               <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                id="desc"
+                value={formData.desc}
+                onChange={(e) => setFormData({ ...formData, desc: e.target.value })}
                 rows={3}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="image">Image URL</Label>
+              <Label htmlFor="img">Image URL</Label>
               <Input
-                id="image"
-                value={formData.image}
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                id="img"
+                value={formData.img}
+                onChange={(e) => setFormData({ ...formData, img: e.target.value })}
                 placeholder="https://..."
               />
             </div>
@@ -423,36 +348,37 @@ export default function ProductsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="categories">Categories</Label>
+                <Label htmlFor="discount">Discount (%)</Label>
                 <Input
-                  id="categories"
-                  value={formData.categories}
-                  onChange={(e) => setFormData({ ...formData, categories: e.target.value })}
-                  placeholder="Electronics, Home"
+                  id="discount"
+                  type="number"
+                  value={formData.discount}
+                  onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
+                  placeholder="0"
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="size">Sizes</Label>
+                <Label htmlFor="sizes">Sizes (comma separated)</Label>
                 <Input
-                  id="size"
-                  value={formData.size}
-                  onChange={(e) => setFormData({ ...formData, size: e.target.value })}
+                  id="sizes"
+                  value={formData.sizes}
+                  onChange={(e) => setFormData({ ...formData, sizes: e.target.value })}
                   placeholder="S, M, L, XL"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="color">Colors</Label>
+                <Label htmlFor="colors">Colors (comma separated)</Label>
                 <Input
-                  id="color"
-                  value={formData.color}
-                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  id="colors"
+                  value={formData.colors}
+                  onChange={(e) => setFormData({ ...formData, colors: e.target.value })}
                   placeholder="Red, Blue, Green"
                 />
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center space-x-2">
               <Switch
                 id="inStock"
                 checked={formData.inStock}
@@ -483,7 +409,10 @@ export default function ProductsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

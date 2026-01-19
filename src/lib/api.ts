@@ -93,3 +93,27 @@ export const cartAPI = {
   getAll: () => fetchAPI('/carts'),
   getByUser: (userId: number) => fetchAPI(`/carts/find/${userId}`),
 };
+
+// Contact API
+export const contactAPI = {
+  create: (data: Record<string, unknown>) =>
+    fetchAPI('/contact', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    }),
+};
+
+// payment API
+export const stripeAPI = {
+  create: (data: Record<string, unknown>) =>
+    fetchAPI('/stripe/create-checkout-session', { 
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+};
+
+
