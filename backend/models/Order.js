@@ -23,8 +23,13 @@ const Order = sequelize.define('Order', {
         type: DataTypes.STRING(255),
         allowNull: true
     },
+    orderNumber: {
+        type: DataTypes.STRING(6),
+        allowNull: false,
+        unique: true
+    },
     products: {
-        type: DataTypes.JSON, // Store products array as JSON
+        type: DataTypes.JSON,
         allowNull: false
     },
     amount: {
@@ -32,7 +37,7 @@ const Order = sequelize.define('Order', {
         allowNull: false
     },
     address: {
-        type: DataTypes.JSON, // Store address object as JSON
+        type: DataTypes.JSON,
         allowNull: true
     },
     status: {

@@ -8,6 +8,9 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    allowedHosts: [
+      'combatable-lilith-unobjectivized.ngrok-free.dev'
+    ],
     hmr: {
       overlay: false,
     },

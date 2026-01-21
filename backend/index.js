@@ -1,4 +1,3 @@
-// express, mysql server import 
 const express = require("express");
 const app = express();
 const sequelize = require("./config/database");
@@ -11,40 +10,44 @@ const productRoute = require("./routes/product");
 const cartRoute = require("./routes/cart");
 const orderRoute = require("./routes/order");
 const authenticationUser = require("./routes/authentication");
-const stripe = require("./routes/stripe");
+const stripeRoute = require("./routes/stripe");
+const stripeWebhook = require("./routes/stripeWebhook");
 const contact = require("./routes/contact");
 
 dotenv.config();
 
-// MySQL database connection and sync
-sequelize
-    .authenticate()
-    .then(() => {
-        console.log("MySQL Database connection established successfully.");
-        // Sync all models with database
-        return sequelize.sync({ alter: true }); // Use { force: true } to drop and recreate tables
-    })
-    .then(() => {
-        console.log("Database synchronized successfully.");
-    })
-    .catch((err) => {
-        console.error("Unable to connect to the database:", err);
-    });
+// ⚠️ Stripe webhook must be first
+app.post(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  stripeWebhook
+);
 
-// Allow Localhost access to fetch data by react 
+// Normal middleware
 app.use(cors());
-
-// Routes linking and using
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Routes
 app.use("/api/auth", authenticationUser);
 app.use("/api/users", userRoute);
 app.use("/api/products", productRoute);
 app.use("/api/cart", cartRoute);
 app.use("/api/orders", orderRoute);
-app.use("/api/stripe", stripe);
+app.use("/api/stripe", stripeRoute);
 app.use("/api/contact", contact);
 
-// Server connection
+// Database connection
+sequelize
+  .authenticate()
+  .then(() => {
+    console.log("MySQL Database connection established successfully.");
+    return sequelize.sync({ alter: true });
+  })
+  .then(() => console.log("Database synchronized successfully."))
+  .catch((err) => console.error("DB connection error:", err));
+
+// Server start
 app.listen(process.env.PORT || 5000, () => {
-    console.log("Server connected on port", process.env.PORT || 5000);
+  console.log("Server running on port", process.env.PORT || 5000);
 });

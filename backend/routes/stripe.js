@@ -1,126 +1,104 @@
 const router = require("express").Router();
-const express = require('express');
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const Order = require("../models/Order");
 
 const YOUR_DOMAIN = process.env.CLIENT_DOMAIN || 'http://localhost:8080';
 
-let productsData; // Store products data for webhook
-
-// Stripe payment API
+// Create Checkout Session
 router.post('/create-checkout-session', async (req, res) => {
   try {
-    const { cartItems, total } = req.body;
+    const { cartItems, total, email } = req.body;
 
-    if (!cartItems || cartItems.length === 0) {
-      return res.status(400).json({ message: 'Cart is empty' });
+    // Validate cart
+    if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
+      return res.status(400).json({ message: 'Cart is empty or invalid' });
     }
 
+    // Ensure domain is set
+    if (!YOUR_DOMAIN) {
+      return res.status(500).json({ message: 'CLIENT_DOMAIN is not defined in env' });
+    }
+
+    // Determine shipping cost (free if total > 100€)
     const shipping = total > 100 ? 0 : 9.99;
 
+    // Build Stripe line items for each product
     const line_items = cartItems.map(item => {
-      // Make sure price is a valid number
-      const price = Number(String(item.price).replace(',', '.'));
-      const quantity = parseInt(item.quantity) || 1;
+      const price = Number(item.price);
+      const quantity = Number(item.quantity);
 
-      if (!price || price <= 0) {
-        throw new Error(`Invalid price for item: ${item.title}`);
-      }
+      if (!price || price <= 0) throw new Error(`Invalid price for item ${item.title}`);
+      if (!quantity || quantity <= 0) throw new Error(`Invalid quantity for item ${item.title}`);
 
       return {
         price_data: {
           currency: 'EUR',
           product_data: {
-            name: `${item.title || 'Product'}${item.color ? ` - ${item.color}` : ''}${item.size ? ` - ${item.size}` : ''}`,
-            description: (item.desc || item.description || '').substring(0, 200),
+            name: item.title,
             images: item.img ? [item.img] : [],
           },
-          unit_amount: Math.round(price * 100),
+          unit_amount: Math.round(price * 100), // convert to cents
         },
-        quantity: quantity,
+        quantity,
       };
     });
 
-    // Add shipping as a separate line item
+    // Add shipping as a separate line item if needed
     if (shipping > 0) {
       line_items.push({
         price_data: {
           currency: 'EUR',
-          product_data: { name: 'Frais de livraison' },
-          unit_amount: Math.round(shipping * 100),
+          product_data: { name: 'Shipping' },
+          unit_amount: Math.round(shipping * 100), // convert to cents
         },
         quantity: 1,
       });
     }
 
+    // Create Stripe Checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
-      shipping_address_collection: { allowed_countries: ['FR'] },
-      line_items,
       mode: 'payment',
+      line_items,
+      customer_email: email || undefined,
+      shipping_address_collection: { allowed_countries: ['FR'] },
       metadata: {
-        cart_ids: cartItems.map(i => i._id).join(','), // only store IDs
-        cart_quantity: cartItems.length.toString(),
-        },
+        cart_ids: cartItems.map(i => i._id).join(','),
+        userId: req.user?.id || req.body.userId || '',
+      },
       success_url: `${YOUR_DOMAIN}/successPayment?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${YOUR_DOMAIN}/cart`,
     });
 
+    // Send session URL to frontend
     res.json({ url: session.url });
+
   } catch (err) {
-    console.error('Stripe session error:', err);
-    res.status(500).json({ error: err.message });
+    console.error('Stripe session creation error:', err);
+    res.status(500).json({ message: err.message || 'Internal Server Error' });
   }
 });
 
-
-const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  const sig = req.headers['stripe-signature'];
-
-  let event;
+// Retrieve Stripe Checkout session
+router.get("/checkout-session/:sessionId", async (req, res) => {
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+    const { sessionId } = req.params;
+    if (!sessionId) return res.status(400).json({ message: "Session ID is required" });
+
+    // Retrieve session from Stripe
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ["line_items", "customer"] 
+    });
+
+    if (!session) return res.status(404).json({ message: "Stripe session not found" });
+
+    res.json(session);
   } catch (err) {
-    console.log(`Webhook Error: ${err.message}`);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    console.error("Stripe API error:", err);
+    res.status(400).json({
+      message: "Invalid or expired Stripe session",
+      error: err.message
+    });
   }
-
-  const data = event.data.object;
-
-  if (event.type === "checkout.session.completed") {
-    try {
-      const session = await stripe.checkout.sessions.retrieve(data.id, { expand: ['customer'] });
-      const items = JSON.parse(session.metadata.cart || '[]');
-
-      await Order.create({
-        customerId: session.customer?.id || null,
-        paymentIntentId: session.payment_intent,
-        products: items,
-        amount: session.amount_total / 100,
-        address: session.shipping_details || null,
-        status: 'paid', // mark as paid
-      });
-
-      console.log("Order created for session:", session.id);
-    } catch (err) {
-      console.error("Error creating order:", err);
-    }
-  }
-
-  res.json({ received: true });
-});
-
-
-// Get checkout session details
-router.get('/checkout-session/:sessionId', async (req, res) => {
-    try {
-        const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
-        res.json(session);
-    } catch (error) {
-        res.status(500).json(error);
-    }
 });
 
 module.exports = router;

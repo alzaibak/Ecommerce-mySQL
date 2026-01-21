@@ -5,6 +5,39 @@ const sequelize = require('../config/database');
 const CryptoJS = require("crypto-js");
 const { tokenVerificationAndAdmin, tokenVerificationAndAuthorization } = require("./tokenVerification");
 
+
+// Get order by PaymentIntent ID (to show after confirmation)
+router.get("/payment-intent/:paymentIntentId", async (req, res) => {
+  console.log("Looking for paymentIntentId:", req.params.paymentIntentId);
+  try {
+    const { paymentIntentId } = req.params;
+
+    const order = await Order.findOne({
+      where: { paymentIntentId }
+    });
+
+    console.log("Order found:", order);
+
+    return res.status(200).json(order || null);
+  } catch (err) {
+    console.error("Error fetching order by paymentIntentId:", err);
+    res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+});
+
+// Get all orders for one user
+router.get("/find/:email", tokenVerificationAndAuthorization, async (req, res) => {
+    try {
+        const orderInfo = await Order.findOne({
+            where: { email: req.params.email }
+        });
+        res.status(200).json(orderInfo);
+    } catch (err) {
+        res.status(500).json(err);
+    }
+});
+
+
 // add new order to the database
 router.post("/", async (req, res) => {
     try {
@@ -46,17 +79,6 @@ router.delete("/:id",tokenVerificationAndAdmin,  async (req, res) => {
     }
 });
 
-// Get all orders for one user
-router.get("/find/:userId", tokenVerificationAndAuthorization, async (req, res) => {
-    try {
-        const orderInfo = await Order.findOne({
-            where: { userId: req.params.userId }
-        });
-        res.status(200).json(orderInfo);
-    } catch (err) {
-        res.status(500).json(err);
-    }
-});
 
 // Get all orders by admin only
 router.get("/", tokenVerificationAndAdmin, async (req, res) => {

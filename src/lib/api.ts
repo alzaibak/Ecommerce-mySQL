@@ -5,6 +5,7 @@ const getToken = () => localStorage.getItem('adminToken') || localStorage.getIte
 
 // Generic fetch wrapper
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
+  console.log("Fetching URL:", `${API_BASE_URL}${endpoint}`);
   const token = getToken();
   
   const headers: HeadersInit = {
@@ -81,6 +82,8 @@ export const productsAPI = {
 export const ordersAPI = {
   getAll: () => fetchAPI('/orders'),
   getById: (id: number) => fetchAPI(`/orders/find/${id}`),
+  getByPaymentIntent: (paymentIntentId: string) =>
+    fetchAPI(`/orders/payment-intent/${paymentIntentId}`), // NEW
   getByUser: (userId: number) => fetchAPI(`/orders/user/${userId}`),
   update: (id: number, data: Record<string, unknown>) =>
     fetchAPI(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
