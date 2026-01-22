@@ -1,42 +1,45 @@
+// middleware/tokenVerification.js
 const jsonWebToken = require("jsonwebtoken");
 
-// token verification function
+
+// Base verification
 const tokenVerification = (req, res, next) => {
-    const authHeader = req.headers.token;
+  const authHeader = req.headers.authorization;
 
-    if (authHeader) {
-        const token = authHeader.split(" ")[1];
-        jsonWebToken.verify(token, process.env.JWT_SECRET_KEY, (err, user) => {
-            if (err) return res.status(403).json("Wrong token");
-            req.user = user;
-            next();
-        });
-    } else {
-        return res.status(401).json("You are not authenticated");
-    }
+  if (!authHeader)
+    return res.status(401).json({ message: "You are not authenticated" });
+
+  const token = authHeader.split(" ")[1];
+
+  jsonWebToken.verify(token, process.env.JWT_SECRET_KEY, (err, user) => {
+    if (err) return res.status(403).json({ message: "Wrong token" });
+
+    req.user = user; // { id, email, isAdmin }
+    next();
+  });
 };
 
-// user token with id verification before updating the personal info
+// User OR admin (by id)
 const tokenVerificationAndAuthorization = (req, res, next) => {
-    tokenVerification(req, res, () => {
-        if (req.user.id === parseInt(req.params.id) || req.user.isAdmin) {
-            next();
-        } else {
-            res.status(403).json("You are not allowed to do that");
-        }
-    });
+  tokenVerification(req, res, () => {
+    if (req.user.id === Number(req.params.id) || req.user.isAdmin) {
+      next();
+    } else {
+      res.status(403).json("You are not allowed");
+    }
+  });
 };
 
-// admin token verification before adding or deleting products
+// Admin only
 const tokenVerificationAndAdmin = (req, res, next) => {
-    tokenVerification(req, res, () => {
-        if (req.user.isAdmin) {
-            next();
-        } else {
-            res.status(403).json("You are not admin");
-        }
-    });
+  tokenVerification(req, res, () => {
+    if (req.user.isAdmin) next();
+    else res.status(403).json("You are not admin");
+  });
 };
 
-
-module.exports = { tokenVerification, tokenVerificationAndAuthorization, tokenVerificationAndAdmin };
+module.exports = {
+  tokenVerification,
+  tokenVerificationAndAuthorization,
+  tokenVerificationAndAdmin,
+};

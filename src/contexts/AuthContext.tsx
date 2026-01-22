@@ -23,22 +23,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    // Check if user is logged in on mount
-    const token = localStorage.getItem('adminToken');
-    const userData = localStorage.getItem('adminUser');
-    
-    if (token && userData) {
-      try {
-        setUser(JSON.parse(userData));
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-        localStorage.removeItem('adminToken');
-        localStorage.removeItem('adminUser');
-      }
+ useEffect(() => {
+  const token = localStorage.getItem("adminToken");
+  const userData = localStorage.getItem("adminUser");
+
+  if (token && userData) {
+    try {
+      setUser(JSON.parse(userData));
+    } catch {
+      localStorage.clear();
     }
-    setIsLoading(false);
-  }, []);
+  }
+  setIsLoading(false);
+}, []);
 
   const login = async (email: string, password: string) => {
     const response = await api.post('/auth/login', { email, password });

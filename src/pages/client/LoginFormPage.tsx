@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, LogIn, Loader2 } from 'lucide-react';
 import ClientLayout from '@/components/client/ClientLayout';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { loginStart, loginSuccess, loginFailure } from '@/redux/userSlice';
 
 const LoginFormPage = () => {
   const navigate = useNavigate();
+  const location = useLocation(); // 🔹 Get redirect info
   const dispatch = useAppDispatch();
   const { isFetching } = useAppSelector((state) => state.user);
   const { toast } = useToast();
@@ -43,22 +44,27 @@ const LoginFormPage = () => {
     dispatch(loginStart());
     try {
       const response = await api.post('/auth/login', formData);
-      // Transform user data to match frontend expectations (firstName -> firstname, lastName -> lastname, id -> _id)
       const transformedUser = {
-        ...response.user,
-        _id: String(response.user.id || response.user._id),
-        firstname: response.user.firstName || response.user.firstname || '',
-        lastname: response.user.lastName || response.user.lastname || '',
+        _id: String(response.user.id),
+        firstname: response.user.firstName,
+        lastname: response.user.lastName,
+        email: response.user.email,
+        isAdmin: response.user.isAdmin,
       };
-      dispatch(loginSuccess({
-        userInfo: transformedUser,
-        token: response.token,
-      }));
+      dispatch(
+        loginSuccess({
+          userInfo: transformedUser,
+          token: response.token,
+        })
+      );
       toast({
         title: 'Succès',
         description: 'Connexion réussie!',
       });
-      navigate('/');
+
+      // 🔹 Redirect back to "from" or default "/"
+      const from = (location.state as any)?.from || '/';
+      navigate(from);
     } catch (error: any) {
       dispatch(loginFailure());
       toast({

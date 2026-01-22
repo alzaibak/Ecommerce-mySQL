@@ -3,7 +3,7 @@ const Order = require("../models/Order");
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
 const CryptoJS = require("crypto-js");
-const { tokenVerificationAndAdmin, tokenVerificationAndAuthorization } = require("./tokenVerification");
+const { tokenVerificationAndAdmin, tokenVerificationAndAuthorization,tokenVerification } = require("./tokenVerification");
 
 
 // Get order by PaymentIntent ID (to show after confirmation)
@@ -25,16 +25,28 @@ router.get("/payment-intent/:paymentIntentId", async (req, res) => {
   }
 });
 
-// Get all orders for one user
-router.get("/find/:email", tokenVerificationAndAuthorization, async (req, res) => {
-    try {
-        const orderInfo = await Order.findOne({
-            where: { email: req.params.email }
-        });
-        res.status(200).json(orderInfo);
-    } catch (err) {
-        res.status(500).json(err);
-    }
+
+// Get all orders for logged-in user
+router.get('/user/orders', tokenVerification, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const orders = await Order.findAll({
+      where: { userId },
+      order: [['createdAt', 'DESC']],
+    });
+
+    res.json(orders);
+  } catch (err) {
+    console.error('Fetch orders failed:', err);
+    res.status(500).json({ message: 'Failed to fetch orders' });
+  }
+});
+
+// ✅ ADMIN: ALL ORDERS
+router.get("/", tokenVerificationAndAdmin, async (req, res) => {
+  const orders = await Order.findAll();
+  res.json(orders);
 });
 
 

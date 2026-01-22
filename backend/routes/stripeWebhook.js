@@ -53,11 +53,8 @@ module.exports = async (req, res) => {
 
       const orderNumber = generateOrderNumber();
 
-      // Parse userId to integer if it exists and is not empty
-      const userId = session.metadata?.userId && session.metadata.userId.trim() !== ''
-        ? parseInt(session.metadata.userId)
-        : null;
-
+      // Parse userId to integer 
+      const userId = parseInt(session.metadata.userId);
       // Create order and store it in a variable
       const newOrder = await Order.create({
         userId: userId,

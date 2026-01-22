@@ -11,12 +11,14 @@ export interface UserInfo {
 
 interface UserState {
   currentUser: { userInfo: UserInfo; token: string } | null;
+  token: string | null;
   isFetching: boolean;
   error: boolean;
 }
 
 const initialState: UserState = {
   currentUser: null,
+  token: null,
   isFetching: false,
   error: false,
 };
@@ -32,6 +34,7 @@ const userSlice = createSlice({
     loginSuccess(state, action: PayloadAction<{ userInfo: UserInfo; token: string }>) {
       state.isFetching = false;
       state.currentUser = action.payload;
+      state.token = action.payload.token;
       state.error = false;
     },
     loginFailure(state) {

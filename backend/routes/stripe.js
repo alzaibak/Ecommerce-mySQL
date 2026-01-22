@@ -59,11 +59,11 @@ router.post('/create-checkout-session', async (req, res) => {
       payment_method_types: ['card'],
       mode: 'payment',
       line_items,
-      customer_email: email || undefined,
+      customer_email: email,
       shipping_address_collection: { allowed_countries: ['FR'] },
       metadata: {
         cart_ids: cartItems.map(i => i._id).join(','),
-        userId: req.user?.id || req.body.userId || '',
+        userId: Number(req.body.userId),
       },
       success_url: `${YOUR_DOMAIN}/successPayment?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${YOUR_DOMAIN}/cart`,

@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {ordersAPI} from '@/lib/api';
+
 import { 
   User, 
   Package, 
@@ -30,10 +32,16 @@ interface Order {
     price?: number;
   }>;
   amount: number;
-  address: string;
+  address: string | {
+    name?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+  };
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   createdAt: string;
 }
+
 
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-500/10 text-yellow-600',
@@ -59,33 +67,39 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!currentUser) {
-      navigate('/login');
-      return;
-    }
+  if (!currentUser) {
+    navigate("/login");
+    return;
+  }
 
-    const fetchOrders = async () => {
-      try {
-        const response = await api.get(`/orders/user/${currentUser.userInfo._id}`);
-        setOrders(response);
-      } catch (error) {
-        console.error('Error fetching orders:', error);
-      } finally {
-        setLoading(false);
+  const fetchOrders = async () => {
+    try {
+      const data = await ordersAPI.getMyOrders();
+      setOrders(data);
+    } catch (err: any) {
+      console.error("Error fetching orders:", err);
+
+      // 🔐 Handle auth errors properly
+      if (err.status === 401 || err.status === 403) {
+        dispatch(logout());
+        navigate("/login");
       }
-    };
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchOrders();
-  }, [currentUser, navigate]);
+  fetchOrders();
+}, [currentUser, navigate, dispatch]);
+
 
   const handleLogout = () => {
     dispatch(logout());
-    navigate('/');
+    localStorage.removeItem("token");
+    navigate("/login");
   };
 
-  if (!currentUser) {
-    return null;
-  }
+  if (!currentUser) return null;
 
   return (
     <ClientLayout>
@@ -182,69 +196,77 @@ const ProfilePage = () => {
                   </Card>
                 ) : (
                   <div className="space-y-4">
-                    {orders.map((order) => (
-                      <Card key={order._id} className="card-shadow overflow-hidden">
-                        <CardHeader className="bg-secondary/30 py-4">
-                          <div className="flex flex-wrap items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Calendar className="h-4 w-4" />
-                                {new Date(order.createdAt).toLocaleDateString('fr-FR', {
-                                  day: 'numeric',
-                                  month: 'long',
-                                  year: 'numeric'
-                                })}
-                              </div>
-                              <Badge className={statusColors[order.status]}>
-                                {statusLabels[order.status]}
-                              </Badge>
-                            </div>
-                            <p className="font-bold text-lg">
-                              €{order.amount.toFixed(2)}
-                            </p>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="py-4">
-                          <div className="space-y-3">
-                            {order.products.map((item, idx) => (
-                              <div 
-                                key={idx} 
-                                className="flex items-center gap-4 p-3 rounded-lg bg-secondary/20"
-                              >
-                                {item.img && (
-                                  <img 
-                                    src={item.img} 
-                                    alt={item.title || 'Product'}
-                                    className="w-16 h-16 object-contain rounded-lg bg-background"
-                                  />
-                                )}
-                                <div className="flex-1">
-                                  <p className="font-medium text-foreground">
-                                    {item.title || `Produit #${item.productId}`}
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    Quantité: {item.quantity}
-                                  </p>
-                                </div>
-                                {item.price && (
-                                  <p className="font-medium">
-                                    €{(item.price * item.quantity).toFixed(2)}
-                                  </p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                          
-                          {order.address && (
-                            <div className="flex items-start gap-2 mt-4 pt-4 border-t border-border">
-                              <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                              <p className="text-sm text-muted-foreground">{order.address}</p>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+  {orders.map((order) => (
+    <Card key={order._id} className="card-shadow overflow-hidden">
+      <CardHeader className="bg-secondary/30 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Calendar className="h-4 w-4" />
+              {new Date(order.createdAt).toLocaleDateString('fr-FR', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
+            </div>
+            <Badge className={statusColors[order.status]}>
+              {statusLabels[order.status]}
+            </Badge>
+          </div>
+          <p className="font-bold text-lg">
+            €{Number(order.amount).toFixed(2)}
+          </p>
+        </div>
+      </CardHeader>
+
+      <CardContent className="py-4">
+        {/* Products */}
+        <div className="space-y-3">
+          {order.products.map((item, idx) => (
+            <div
+              key={idx}
+              className="flex items-center gap-4 p-3 rounded-lg bg-secondary/20"
+            >
+              {item.img && (
+                <img
+                  src={item.img}
+                  alt={item.title || `Produit #${item.productId}`}
+                  className="w-16 h-16 object-contain rounded-lg bg-background"
+                />
+              )}
+              <div className="flex-1">
+                <p className="font-medium text-foreground">
+                  {item.title || `Produit #${item.productId}`}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Quantité: {item.quantity}
+                </p>
+              </div>
+              {item.price != null && (
+                <p className="font-medium">
+                  €{(item.price * item.quantity).toFixed(2)}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Address */}
+        {order.address && (
+          <div className="flex items-start gap-2 mt-4 pt-4 border-t border-border">
+            <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+            <p className="text-sm text-muted-foreground">
+              {typeof order.address === 'string'
+                ? order.address
+                : `${order.address.name || ''}${order.address.name ? ', ' : ''}${order.address.address || ''}`}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  ))}
+</div>
+
                 )}
               </TabsContent>
 

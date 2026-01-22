@@ -25,9 +25,11 @@ import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import NotFound from "./pages/NotFound";
 import SuccessPaymentPage from "./pages/client/SuccessPaymentPage";
 import CategoriesPage from "./pages/admin/CategoriesPage";
+import {clearCorruptedStorage} from './utils/clearStorage'
+// Clear any corrupted admin storage immediately
+clearCorruptedStorage();
 
 const queryClient = new QueryClient();
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>

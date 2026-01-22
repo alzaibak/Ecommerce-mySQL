@@ -55,6 +55,7 @@ const loginHandler = async (req, res, adminOnly = false) => {
     const token = jwt.sign(
       {
         id: user.id,
+        email:user.email,
         isAdmin: user.isAdmin,
       },
       process.env.JWT_SECRET_KEY,

@@ -4,6 +4,7 @@ import { CreditCard, Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
 import { useAppSelector } from '@/redux/hooks';
+import { useNavigate } from 'react-router-dom';
 
 interface CartItem {
   _id: string;
@@ -22,16 +23,23 @@ interface PayButtonProps {
 const PayButton = ({ cartItems, total, disabled }: PayButtonProps) => {
   const [loading, setLoading] = useState(false);
   const user = useAppSelector(state => state.user.currentUser);
+  const navigate = useNavigate();
 
   const handlePayment = async () => {
+    // Check if user is logged in
+    if (!user) {
+      // Redirect to login with a "redirect back to cart" state
+      navigate("/login", { state: { from: "/cart" } });
+      return;
+    }
+
     setLoading(true);
     try {
-      // Pass user email if logged in
       const data = await api.post('/stripe/create-checkout-session', { 
         cartItems, 
         total,
-        email: user?.userInfo.email || null,
-        userId: user?.userInfo._id,
+        email: user.userInfo.email,
+        userId: user.userInfo._id,
       });
 
       if (data?.url) {
@@ -41,6 +49,7 @@ const PayButton = ({ cartItems, total, disabled }: PayButtonProps) => {
       }
     } catch (error) {
       console.error('Payment error:', error);
+      alert('Erreur lors de la création du paiement. Veuillez réessayer.');
     } finally {
       setLoading(false);
     }

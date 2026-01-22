@@ -1,16 +1,29 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
-// Get token from localStorage
-const getToken = () => localStorage.getItem('adminToken') || localStorage.getItem('userToken');
+import {store} from "../redux/store";
 
-// Generic fetch wrapper
-async function fetchAPI(endpoint: string, options: RequestInit = {}) {
-  console.log("Fetching URL:", `${API_BASE_URL}${endpoint}`);
+/* ============================
+   SINGLE TOKEN SOURCE (REDUX)
+============================ */
+const getToken = () => {
+  return store.getState().user.token;
+};
+
+/* ============================
+   FETCH WRAPPER
+============================ */
+export async function fetchAPI(
+  endpoint: string,
+  options: RequestInit & { skipAuth?: boolean } = {}
+) {
   const token = getToken();
-  
+
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...(token && { token: `Bearer ${token}` }),
+    "Content-Type": "application/json",
+    ...(token && !options.skipAuth && {
+      Authorization: `Bearer ${token}`,
+    }),
     ...options.headers,
   };
 
@@ -20,34 +33,45 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(error.message || error);
+    const error = await response.json().catch(() => ({
+      message: "API error",
+    }));
+
+    throw {
+      message: error.message || "API error",
+      status: response.status,
+    };
   }
 
   return response.json();
 }
 
+
+
 // Default API object for simple usage
 const api = {
   get: (endpoint: string) => fetchAPI(endpoint),
-  post: (endpoint: string, data: unknown) => fetchAPI(endpoint, { method: 'POST', body: JSON.stringify(data) }),
-  put: (endpoint: string, data: unknown) => fetchAPI(endpoint, { method: 'PUT', body: JSON.stringify(data) }),
+  post: (endpoint: string, data: unknown) =>
+    fetchAPI(endpoint, { method: 'POST', body: JSON.stringify(data) }),
+  put: (endpoint: string, data: unknown) =>
+    fetchAPI(endpoint, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (endpoint: string) => fetchAPI(endpoint, { method: 'DELETE' }),
 };
-
-export default api;
 
 // Auth API
 export const authAPI = {
   login: (email: string, password: string) =>
-    fetchAPI('/auth/login', {
-      method: 'POST',
+    fetchAPI("/auth/login", {
+      method: "POST",
       body: JSON.stringify({ email, password }),
+      skipAuth: true, // 🔥 IMPORTANT
     }),
-  register: (userData: { firstName: string; lastName: string; email: string; password: string }) =>
-    fetchAPI('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(userData),
+
+  register: (data: any) =>
+    fetchAPI("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(data),
+      skipAuth: true,
     }),
 };
 
@@ -82,9 +106,8 @@ export const productsAPI = {
 export const ordersAPI = {
   getAll: () => fetchAPI('/orders'),
   getById: (id: number) => fetchAPI(`/orders/find/${id}`),
-  getByPaymentIntent: (paymentIntentId: string) =>
-    fetchAPI(`/orders/payment-intent/${paymentIntentId}`), // NEW
-  getByUser: (userId: number) => fetchAPI(`/orders/user/${userId}`),
+  getByPaymentIntent: (paymentIntentId: string) => fetchAPI(`/orders/payment-intent/${paymentIntentId}`),
+  getMyOrders: () => fetchAPI("/orders/user/orders"),
   update: (id: number, data: Record<string, unknown>) =>
     fetchAPI(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) => fetchAPI(`/orders/${id}`, { method: 'DELETE' }),
@@ -100,23 +123,13 @@ export const cartAPI = {
 // Contact API
 export const contactAPI = {
   create: (data: Record<string, unknown>) =>
-    fetchAPI('/contact', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    }),
+    fetchAPI('/contact', { method: 'POST', body: JSON.stringify(data) }),
 };
 
-// payment API
+// Stripe API
 export const stripeAPI = {
   create: (data: Record<string, unknown>) =>
-    fetchAPI('/stripe/create-checkout-session', { 
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    }),
+    fetchAPI('/stripe/create-checkout-session', { method: 'POST', body: JSON.stringify(data) }),
 };
 
-
+export default api;

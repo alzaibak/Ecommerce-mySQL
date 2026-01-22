@@ -1,22 +1,56 @@
 // Utility to clear corrupted localStorage data
 export const clearCorruptedStorage = () => {
   try {
-    const adminToken = localStorage.getItem('adminToken');
-    const adminUser = localStorage.getItem('adminUser');
+    // List all possible token keys
+    const tokenKeys = ['token', 'adminToken', 'userToken', 'authToken'];
     
-    // If either exists but is invalid, clear both
-    if (adminToken || adminUser) {
+    // List all possible user info keys
+    const userInfoKeys = ['user', 'adminUser', 'userInfo', 'currentUser'];
+    
+    // Check and clear corrupted tokens
+    tokenKeys.forEach(key => {
+      const token = localStorage.getItem(key);
+      if (token) {
+        // Check if token is valid JWT format (basic check)
+        const parts = token.split('.');
+        if (parts.length !== 3) {
+          localStorage.removeItem(key);
+          console.log(`Cleared invalid token format from: ${key}`);
+        }
+      }
+    });
+    
+    // Check and clear corrupted user info
+    userInfoKeys.forEach(key => {
+      const userInfo = localStorage.getItem(key);
+      if (userInfo) {
+        try {
+          JSON.parse(userInfo);
+        } catch {
+          localStorage.removeItem(key);
+          console.log(`Cleared corrupted user info from: ${key}`);
+        }
+      }
+    });
+    
+    // Clear Redux persist if you're using it
+    const reduxKeys = Object.keys(localStorage).filter(key => 
+      key.startsWith('persist:')
+    );
+    
+    reduxKeys.forEach(key => {
       try {
-        if (adminUser) {
-          JSON.parse(adminUser);
+        const value = localStorage.getItem(key);
+        if (value) {
+          JSON.parse(value);
         }
       } catch {
-        // Invalid JSON - clear storage
-        localStorage.removeItem('adminToken');
-        localStorage.removeItem('adminUser');
-        console.log('Cleared corrupted admin storage data');
+        localStorage.removeItem(key);
+        console.log(`Cleared corrupted Redux state: ${key}`);
       }
-    }
+    });
+    
+    console.log('Storage cleanup completed');
   } catch (error) {
     console.error('Error clearing storage:', error);
   }
