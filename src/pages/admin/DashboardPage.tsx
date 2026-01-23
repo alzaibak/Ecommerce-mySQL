@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Users, Package, ShoppingCart, DollarSign } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { usersAPI, productsAPI, ordersAPI } from '@/lib/api';
+import DashboardLayout from '@/components/admin/DashboardLayout';
 
 interface Stats {
   totalUsers: number;
@@ -119,6 +120,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <DashboardLayout>
       <div>
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
         <p className="text-muted-foreground">Welcome to your admin dashboard</p>
@@ -217,6 +219,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+       </DashboardLayout>
     </div>
   );
 }

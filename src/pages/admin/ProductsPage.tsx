@@ -35,6 +35,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Plus, Search, Trash2, Edit, Package } from 'lucide-react';
 import { productsAPI } from '@/lib/api';
+import DashboardLayout from '@/components/admin/DashboardLayout';
+
 
 interface Product {
   _id: string;
@@ -204,6 +206,7 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
+      <DashboardLayout>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Products</h1>
@@ -418,6 +421,7 @@ export default function ProductsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </DashboardLayout>
     </div>
   );
 }

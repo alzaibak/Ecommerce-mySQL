@@ -31,7 +31,7 @@ const LoginFormPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (!formData.email || !formData.password) {
       toast({
         title: 'Erreur',

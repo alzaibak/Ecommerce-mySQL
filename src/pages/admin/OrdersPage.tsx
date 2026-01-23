@@ -28,6 +28,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Search, Eye, Package, MapPin, CreditCard } from 'lucide-react';
+import DashboardLayout from '@/components/admin/DashboardLayout';
+
 
 interface OrderProduct {
   productId: number;
@@ -148,6 +150,7 @@ export default function OrdersPage() {
 
   return (
     <div className="space-y-6">
+      <DashboardLayout>
       <div>
         <h1 className="text-3xl font-bold text-foreground">Orders</h1>
         <p className="text-muted-foreground">Manage and track customer orders</p>
@@ -331,6 +334,7 @@ export default function OrdersPage() {
           )}
         </DialogContent>
       </Dialog>
+      </DashboardLayout>
     </div>
   );
 }

@@ -33,6 +33,8 @@ import {
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Trash2, Edit, FolderOpen } from 'lucide-react';
+import DashboardLayout from '@/components/admin/DashboardLayout';
+
 
 interface Category {
   _id: string;
@@ -153,6 +155,7 @@ export default function CategoriesPage() {
 
   return (
     <div className="space-y-6">
+      <DashboardLayout>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Categories</h1>
@@ -320,6 +323,7 @@ export default function CategoriesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </DashboardLayout>
     </div>
   );
 }

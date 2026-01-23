@@ -35,6 +35,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Search, Trash2, UserPlus } from 'lucide-react';
 import { authAPI } from '@/lib/api';
+import DashboardLayout from '@/components/admin/DashboardLayout';
+
 
 interface User {
   id: number;
@@ -146,6 +148,7 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
+      <DashboardLayout>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Users</h1>
@@ -290,6 +293,7 @@ export default function UsersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </DashboardLayout>
     </div>
   );
 }
