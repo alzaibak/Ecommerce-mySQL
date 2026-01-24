@@ -104,15 +104,17 @@ export const productsAPI = {
 
 // Orders API
 export const ordersAPI = {
-  getAll: () => fetchAPI('/orders'),
-  getById: (id: number) => fetchAPI(`/orders/find/${id}`),
-  getByPaymentIntent: (paymentIntentId: string) => fetchAPI(`/orders/payment-intent/${paymentIntentId}`),
+  getAll: () => fetchAPI("/orders"),               // Admin only
+  getById: (id: number) => fetchAPI(`/orders/${id}`), // Admin or owner
+  getByPaymentIntent: (paymentIntentId: string) =>
+    fetchAPI(`/orders/payment-intent/${paymentIntentId}`),
   getMyOrders: () => fetchAPI("/orders/user/orders"),
   update: (id: number, data: Record<string, unknown>) =>
-    fetchAPI(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: number) => fetchAPI(`/orders/${id}`, { method: 'DELETE' }),
-  getIncome: () => fetchAPI('/orders/income'),
+    fetchAPI(`/orders/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  delete: (id: number) => fetchAPI(`/orders/${id}`, { method: "DELETE" }),
+  getIncome: () => fetchAPI("/orders/income"),
 };
+
 
 // Cart API
 export const cartAPI = {

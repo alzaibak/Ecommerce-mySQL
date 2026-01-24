@@ -55,10 +55,10 @@ interface Order {
 
 const ORDER_STATUSES = [
   { value: 'pending', label: 'Pending', color: 'bg-yellow-500/10 text-yellow-600' },
-  { value: 'processing', label: 'Processing', color: 'bg-blue-500/10 text-blue-600' },
-  { value: 'prepared', label: 'Prepared', color: 'bg-purple-500/10 text-purple-600' },
+  { value: 'confirmed', label: 'confirmed', color: 'bg-blue-500/10 text-blue-600' },
+  { value: 'processing', label: 'processing', color: 'bg-purple-500/10 text-purple-600' },
   { value: 'shipped', label: 'Shipped', color: 'bg-indigo-500/10 text-indigo-600' },
-  { value: 'delivered', label: 'Delivered', color: 'bg-green-500/10 text-green-600' },
+  { value: 'delivered', label: 'delivered', color: 'bg-green-500/10 text-green-600' },
   { value: 'cancelled', label: 'Cancelled', color: 'bg-red-500/10 text-red-600' },
 ];
 
@@ -208,7 +208,7 @@ export default function OrdersPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="font-medium">
-                    ${order.amount.toFixed(2)}
+                    ${Number(order.amount).toFixed(2)}
                   </TableCell>
                   <TableCell>
                     <Select
