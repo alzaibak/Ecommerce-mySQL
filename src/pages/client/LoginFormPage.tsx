@@ -12,26 +12,21 @@ import { loginStart, loginSuccess, loginFailure } from '@/redux/userSlice';
 
 const LoginFormPage = () => {
   const navigate = useNavigate();
-  const location = useLocation(); // 🔹 Get redirect info
+  const location = useLocation();
   const dispatch = useAppDispatch();
   const { isFetching } = useAppSelector((state) => state.user);
   const { toast } = useToast();
+
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+  const [formData, setFormData] = useState({ email: '', password: '' });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.email || !formData.password) {
       toast({
         title: 'Erreur',
@@ -42,8 +37,10 @@ const LoginFormPage = () => {
     }
 
     dispatch(loginStart());
+
     try {
       const response = await api.post('/auth/login', formData);
+
       const transformedUser = {
         _id: String(response.user.id),
         firstname: response.user.firstName,
@@ -51,22 +48,20 @@ const LoginFormPage = () => {
         email: response.user.email,
         isAdmin: response.user.isAdmin,
       };
-      dispatch(
-        loginSuccess({
-          userInfo: transformedUser,
-          token: response.token,
-        })
-      );
+
+      dispatch(loginSuccess({ userInfo: transformedUser, token: response.token }));
+
       toast({
         title: 'Succès',
         description: 'Connexion réussie!',
       });
 
-      // 🔹 Redirect back to "from" or default "/"
+      // Redirect to previous page or home
       const from = (location.state as any)?.from || '/';
-      navigate(from);
+      navigate(from, { replace: true });
     } catch (error: any) {
       dispatch(loginFailure());
+
       toast({
         title: 'Erreur',
         description: error.message || 'Identifiants invalides',
@@ -81,12 +76,8 @@ const LoginFormPage = () => {
         <div className="container mx-auto max-w-md">
           <div className="bg-card border border-border rounded-xl p-8 card-shadow animate-fade-in-up">
             <div className="text-center mb-8">
-              <h1 className="text-2xl md:text-3xl font-bold mb-2">
-                Connexion
-              </h1>
-              <p className="text-muted-foreground">
-                Connectez-vous à votre compte
-              </p>
+              <h1 className="text-2xl md:text-3xl font-bold mb-2">Connexion</h1>
+              <p className="text-muted-foreground">Connectez-vous à votre compte</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -130,11 +121,7 @@ const LoginFormPage = () => {
                 disabled={isFetching}
                 className="w-full rounded-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold py-6"
               >
-                {isFetching ? (
-                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                ) : (
-                  <LogIn className="h-5 w-5 mr-2" />
-                )}
+                {isFetching ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <LogIn className="h-5 w-5 mr-2" />}
                 Se connecter
               </Button>
             </form>

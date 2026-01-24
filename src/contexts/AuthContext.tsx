@@ -38,41 +38,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(reduxUser?.userInfo || null);
   const [isLoading, setIsLoading] = useState(true);
 
-useEffect(() => {
-  if (!isLocalStorageAvailable()) return setIsLoading(false);
+  useEffect(() => {
+    if (!isLocalStorageAvailable()) return setIsLoading(false);
 
-  const token = localStorage.getItem('adminToken');
-  const userData = localStorage.getItem('adminUser');
+    const token = localStorage.getItem('adminToken');
+    const userData = localStorage.getItem('adminUser');
 
-  if (token && userData) {
-    try {
-      const parsedUser = JSON.parse(userData);
+    if (token && userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
 
-      // Logout if user is not admin
-      if (!parsedUser.isAdmin) {
-        setUser(null);
-        localStorage.removeItem('adminToken');
-        localStorage.removeItem('adminUser');
-        dispatch(logoutRedux());
-      } else {
-        setUser(parsedUser);
-        dispatch(loginSuccess({ userInfo: parsedUser, token }));
+        // Only admins allowed
+        if (!parsedUser.isAdmin) {
+          setUser(null);
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('adminUser');
+          dispatch(logoutRedux());
+        } else {
+          setUser(parsedUser);
+        }
+      } catch {
+        localStorage.clear();
       }
-    } catch {
-      localStorage.clear();
     }
-  }
 
-  setIsLoading(false);
-}, [dispatch]);
-
+    setIsLoading(false);
+  }, [dispatch]);
 
   const login = async (email: string, password: string) => {
     dispatch(loginStart());
     try {
       const response = await api.post('/auth/admin/login', { email, password });
 
-      if (response.token && response.user) {
+      if (response.token && response.user?.isAdmin) {
         setUser(response.user);
 
         if (isLocalStorageAvailable()) {
@@ -82,7 +80,7 @@ useEffect(() => {
 
         dispatch(loginSuccess({ userInfo: response.user, token: response.token }));
       } else {
-        throw new Error('Invalid credentials');
+        throw new Error('Access denied');
       }
     } catch (error) {
       dispatch(loginFailure());

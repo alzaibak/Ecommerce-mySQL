@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { clearCorruptedStorage } from './utils/clearStorage';
 
 // Client Pages
 import HomePage from "@/pages/client/HomePage";
@@ -14,6 +15,7 @@ import ContactPage from "@/pages/client/ContactPage";
 import CartPage from "@/pages/client/CartPage";
 import LoginFormPage from "@/pages/client/LoginFormPage";
 import SignupPage from "@/pages/client/SignupPage";
+import SuccessPaymentPage from "@/pages/client/SuccessPaymentPage";
 
 // Admin Pages
 import LoginPage from "@/pages/admin/LoginPage";
@@ -21,15 +23,16 @@ import DashboardPage from "@/pages/admin/DashboardPage";
 import UsersPage from "@/pages/admin/UsersPage";
 import ProductsAdminPage from "@/pages/admin/ProductsPage";
 import OrdersPage from "@/pages/admin/OrdersPage";
+import CategoriesPage from "@/pages/admin/CategoriesPage";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
-import NotFound from "./pages/NotFound";
-import SuccessPaymentPage from "./pages/client/SuccessPaymentPage";
-import CategoriesPage from "./pages/admin/CategoriesPage";
-import {clearCorruptedStorage} from './utils/clearStorage'
+
+import NotFound from "@/pages/NotFound";
+
 // Clear any corrupted admin storage immediately
 clearCorruptedStorage();
 
 const queryClient = new QueryClient();
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -49,35 +52,51 @@ const App = () => (
             <Route path="/successPayment" element={<SuccessPaymentPage />} />
             <Route path="/login" element={<LoginFormPage />} />
             <Route path="/signup" element={<SignupPage />} />
-            
-            {/* Admin Routes - Protected */}
+
+            {/* Admin Routes */}
             <Route path="/admin/login" element={<LoginPage />} />
-            <Route path="/admin" element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/users" element={
-              <ProtectedRoute>
-                <UsersPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/products" element={
-              <ProtectedRoute>
-                <ProductsAdminPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/orders" element={
-              <ProtectedRoute>
-                <OrdersPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/categories" element={
-              <ProtectedRoute>
-                <CategoriesPage />
-              </ProtectedRoute>
-            } />
-            
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute>
+                  <UsersPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/products"
+              element={
+                <ProtectedRoute>
+                  <ProductsAdminPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/orders"
+              element={
+                <ProtectedRoute>
+                  <OrdersPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/categories"
+              element={
+                <ProtectedRoute>
+                  <CategoriesPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Fallback */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

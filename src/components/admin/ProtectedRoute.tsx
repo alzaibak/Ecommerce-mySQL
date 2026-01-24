@@ -1,28 +1,18 @@
-// Quick fix for ProtectedRoute.tsx
 import { Navigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { useAppSelector } from '@/redux/hooks';
-import { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: JSX.Element;
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+  const { user, isLoading } = useAuth(); // ✅ only use AuthContext
   const location = useLocation();
-  const { currentUser, isFetching } = useAppSelector((state) => state.user);
-  const [shouldCheck, setShouldCheck] = useState(false);
 
-  // Only start checking after a brief delay to avoid race conditions
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShouldCheck(true);
-    }, 50);
-    return () => clearTimeout(timer);
-  }, []);
+  const isLoginPage = location.pathname === '/admin/login';
 
-  // Show loading while auth state is initializing
-  if (isFetching || !shouldCheck) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-accent" />
@@ -30,38 +20,20 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     );
   }
 
-  // Check if we're already on the login page to prevent loops
-  const isLoginPage = location.pathname === '/admin/login';
+  const isAdmin = user?.isAdmin;
 
-  // Check if user is authenticated and is admin
-  const isAdmin = currentUser?.userInfo?.isAdmin;
-
-  // If not authenticated or not admin
+  // If not admin, redirect to admin login
   if (!isAdmin) {
-    // Clear any admin tokens
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.removeItem('adminToken');
-        localStorage.removeItem('adminUser');
-      } catch {}
-    }
-    
-    // Only redirect if we're not already on the login page
-    if (!isLoginPage) {
-      return <Navigate to="/admin/login" replace />;
-    }
-    
-    // If we're already on login page but not admin, just show null
-    // The login page will handle the UI
+    if (!isLoginPage) return <Navigate to="/admin/login" replace />;
     return null;
   }
 
-  // If user is admin AND we're on login page, redirect to admin dashboard
+  // If already admin and on login page, redirect to dashboard
   if (isAdmin && isLoginPage) {
     return <Navigate to="/admin" replace />;
   }
 
-  // Admin confirmed - render children
+  // Admin granted access
   return children;
 };
 
