@@ -315,7 +315,7 @@ export default function OrdersPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Total Amount</span>
                     <span className="text-lg font-bold">
-                      ${selectedOrder.amount.toFixed(2)}
+                      ${Number(selectedOrder.amount).toFixed(2)}
                     </span>
                   </div>
                 </div>
