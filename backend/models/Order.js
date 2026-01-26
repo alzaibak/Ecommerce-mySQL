@@ -34,7 +34,18 @@ const Order = sequelize.define('Order', {
     },
     amount: {
         type: DataTypes.DECIMAL(10, 2),
-        allowNull: false
+        allowNull: false,
+        validate: {
+            min: 0
+        }
+    },
+    shipping: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0.00,
+        validate: {
+            min: 0
+        }
     },
     address: {
         type: DataTypes.JSON,
@@ -48,7 +59,15 @@ const Order = sequelize.define('Order', {
     tableName: 'orders',
     timestamps: true,
     createdAt: 'createdAt',
-    updatedAt: 'updatedAt'
+    updatedAt: 'updatedAt',
+    // Validation supplémentaire pour vérifier que amount >= shipping
+    validate: {
+        amountGreaterThanShipping() {
+            if (parseFloat(this.amount) < parseFloat(this.shipping)) {
+                throw new Error('Le total (amount) doit être supérieur ou égal aux frais de livraison (shipping)');
+            }
+        }
+    }
 });
 
 module.exports = Order;

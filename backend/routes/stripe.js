@@ -20,6 +20,23 @@ router.post('/create-checkout-session', async (req, res) => {
 
     // Determine shipping cost (free if total > 100€)
     const shipping = total > 100 ? 0 : 9.99;
+    
+    // Calculate product total (sans les frais de livraison)
+    const productTotal = cartItems.reduce((sum, item) => {
+      const price = Number(item.price) || 0;
+      const quantity = Number(item.quantity) || 0;
+      return sum + (price * quantity);
+    }, 0);
+    
+    // Calculate grand total (product total + shipping)
+    const grandTotal = productTotal + shipping;
+
+    console.log("💰 Calculated amounts:", {
+      productTotal,
+      shipping,
+      grandTotal,
+      totalFromFrontend: total
+    });
 
     // Build Stripe line items for each product
     const line_items = cartItems.map(item => {
@@ -42,31 +59,59 @@ router.post('/create-checkout-session', async (req, res) => {
       };
     });
 
-    // Add shipping as a separate line item if needed
-    if (shipping > 0) {
-      line_items.push({
-        price_data: {
-          currency: 'EUR',
-          product_data: { name: 'Shipping' },
-          unit_amount: Math.round(shipping * 100), // convert to cents
-        },
-        quantity: 1,
-      });
-    }
-
-    // Create Stripe Checkout session
-    const session = await stripe.checkout.sessions.create({
+    // Use Stripe shipping options instead of adding shipping as line item
+    const sessionParams = {
       payment_method_types: ['card'],
       mode: 'payment',
       line_items,
       customer_email: email,
-      shipping_address_collection: { allowed_countries: ['FR'] },
+      shipping_address_collection: { 
+        allowed_countries: ['FR'] 
+      },
       metadata: {
         cart_ids: cartItems.map(i => i._id).join(','),
         userId: Number(req.body.userId),
+        product_total: productTotal.toString(),
+        shipping_cost: shipping.toString()
       },
       success_url: `${YOUR_DOMAIN}/successPayment?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${YOUR_DOMAIN}/cart`,
+    };
+
+    // Add shipping options only if shipping cost > 0
+    if (shipping > 0) {
+      sessionParams.shipping_options = [
+        {
+          shipping_rate_data: {
+            type: 'fixed_amount',
+            fixed_amount: {
+              amount: Math.round(shipping * 100),
+              currency: 'EUR',
+            },
+            display_name: 'Livraison standard',
+            delivery_estimate: {
+              minimum: {
+                unit: 'business_day',
+                value: 3,
+              },
+              maximum: {
+                unit: 'business_day',
+                value: 7,
+              },
+            }
+          }
+        }
+      ];
+    }
+
+    // Create Stripe Checkout session
+    const session = await stripe.checkout.sessions.create(sessionParams);
+
+    console.log("✅ Stripe session created:", {
+      sessionId: session.id,
+      amount_total: session.amount_total,
+      amount_subtotal: session.amount_subtotal,
+      shipping_options: session.shipping_options
     });
 
     // Send session URL to frontend
@@ -86,7 +131,7 @@ router.get("/checkout-session/:sessionId", async (req, res) => {
 
     // Retrieve session from Stripe
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ["line_items", "customer"] 
+      expand: ["line_items", "customer", "total_details"] 
     });
 
     if (!session) return res.status(404).json({ message: "Stripe session not found" });

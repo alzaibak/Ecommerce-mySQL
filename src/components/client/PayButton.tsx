@@ -16,11 +16,13 @@ interface CartItem {
 
 interface PayButtonProps {
   cartItems: CartItem[];
-  total: number;
+  subtotal: number; // Sous-total des produits
+  shipping: number; // Frais de livraison
+  total: number; // Total final
   disabled?: boolean;
 }
 
-const PayButton = ({ cartItems, total, disabled }: PayButtonProps) => {
+const PayButton = ({ cartItems, subtotal, shipping, total, disabled }: PayButtonProps) => {
   const [loading, setLoading] = useState(false);
   const user = useAppSelector(state => state.user.currentUser);
   const navigate = useNavigate();
@@ -37,6 +39,8 @@ const PayButton = ({ cartItems, total, disabled }: PayButtonProps) => {
     try {
       const data = await api.post('/stripe/create-checkout-session', { 
         cartItems, 
+        subtotal,
+        shipping,
         total,
         email: user.userInfo.email,
         userId: user.userInfo._id,
