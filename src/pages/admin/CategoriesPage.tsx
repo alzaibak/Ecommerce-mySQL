@@ -450,23 +450,29 @@ export default function CategoriesPage() {
                 <div className="space-y-2">
                   <Label htmlFor="parentId">Parent Category</Label>
                   <Select
-                    value={formData.parentId}
-                    onValueChange={(value) => setFormData({ ...formData, parentId: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select parent category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">None (Main Category)</SelectItem>
-                      {categories
-                        .filter(cat => cat.id !== editingCategory?.id)
-                        .map(cat => (
-                          <SelectItem key={cat.id} value={cat.id.toString()}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+  value={formData.parentId || "none"}
+  onValueChange={(value) =>
+    setFormData({
+      ...formData,
+      parentId: value === "none" ? "" : value,
+    })
+  }
+>
+  <SelectTrigger>
+    <SelectValue placeholder="Select parent category" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="none">None (Main Category)</SelectItem>
+    {categories
+      .filter(cat => cat.id !== editingCategory?.id)
+      .map(cat => (
+        <SelectItem key={cat.id} value={cat.id.toString()}>
+          {cat.name}
+        </SelectItem>
+      ))}
+  </SelectContent>
+</Select>
+
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="order">Display Order</Label>

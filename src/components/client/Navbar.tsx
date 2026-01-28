@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+// components/Navbar.tsx
+import { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, User, LogOut, Menu, ChevronDown, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,35 +14,85 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { categoriesAPI } from '@/lib/api'; // Import categoriesAPI
+
+interface Category {
+  id: number;
+  name: string;
+  slug?: string;
+  description?: string;
+}
 
 const Navbar = () => {
   const location = useLocation();
+  const navigate = useNavigate(); // Add useNavigate
   const dispatch = useAppDispatch();
   const cartQuantity = useAppSelector((state) => state.cart.quantity);
   const currentUser = useAppSelector((state) => state.user.currentUser);
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]); // State for categories
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
+  // Fetch categories on component mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const data = await categoriesAPI.getAll();
+        setCategories(data);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        setCategories([]);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  // Handle category click - navigate to products with category filter
+  const handleCategoryClick = (categoryId: number) => {
+    navigate(`/products?category=${categoryId}`);
+    setMobileMenuOpen(false); // Close mobile menu if open
+  };
+
+  // Base nav links
   const navLinks = [
     { path: '/', label: 'Accueil' },
     { 
       label: 'Boutique',
       dropdown: true,
-      items: [
-        { path: '/products', label: 'Tous les produits' },
-        { path: '/products/vetements', label: 'Vêtements' },
-        { path: '/products/chaussures', label: 'Chaussures' },
-        { path: '/products/accessoires', label: 'Accessoires' },
-      ]
+      // We'll handle dropdown items separately
     },
     { path: '/contact', label: 'Contact' },
+  ];
+
+  // Create dropdown items with categories
+  const boutiqueItems = [
+    { path: '/products', label: 'Tous les produits' },
+    ...categories.map(category => ({
+      onClick: () => handleCategoryClick(category.id),
+      label: category.name
+    }))
   ];
 
   const isActive = (path: string) => location.pathname === path;
 
   const handleLogout = () => {
     dispatch(logout());
+  };
+
+  // Handle search
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/products?search=${encodeURIComponent(searchQuery)}`);
+      setSearchQuery('');
+      setSearchOpen(false);
+    }
   };
 
   return (
@@ -70,19 +121,28 @@ const Navbar = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-48">
-                    {link.items?.map((item) => (
-                      <DropdownMenuItem key={item.path} asChild>
-                        <Link 
-                          to={item.path}
-                          className={cn(
-                            "w-full cursor-pointer",
-                            isActive(item.path) && "bg-accent/10 text-accent"
-                          )}
-                        >
-                          {item.label}
-                        </Link>
+                    {loadingCategories ? (
+                      <DropdownMenuItem className="justify-center">
+                        <div className="animate-spin h-4 w-4 border-2 border-accent border-t-transparent rounded-full" />
                       </DropdownMenuItem>
-                    ))}
+                    ) : (
+                      <>
+                        <DropdownMenuItem asChild>
+                          <Link to="/products" className="cursor-pointer">
+                            Tous les produits
+                          </Link>
+                        </DropdownMenuItem>
+                        {categories.map(category => (
+                          <DropdownMenuItem 
+                            key={category.id}
+                            onClick={() => handleCategoryClick(category.id)}
+                            className="cursor-pointer"
+                          >
+                            {category.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
@@ -185,21 +245,31 @@ const Navbar = () => {
                           <span className="text-lg font-semibold text-primary-foreground px-2">
                             {link.label}
                           </span>
-                          {link.items?.map((item) => (
-                            <Link
-                              key={item.path}
-                              to={item.path}
-                              onClick={() => setMobileMenuOpen(false)}
-                              className={cn(
-                                "block py-2 px-4 rounded-md transition-colors",
-                                isActive(item.path) 
-                                  ? "bg-accent text-accent-foreground" 
-                                  : "text-primary-foreground/80 hover:bg-primary-foreground/10"
-                              )}
-                            >
-                              {item.label}
-                            </Link>
-                          ))}
+                          <Link
+                            to="/products"
+                            onClick={() => setMobileMenuOpen(false)}
+                            className="block py-2 px-4 rounded-md transition-colors text-primary-foreground/80 hover:bg-primary-foreground/10"
+                          >
+                            Tous les produits
+                          </Link>
+                          {loadingCategories ? (
+                            <div className="py-2 px-4 text-center">
+                              <div className="animate-spin h-4 w-4 border-2 border-accent border-t-transparent rounded-full mx-auto" />
+                            </div>
+                          ) : (
+                            categories.map(category => (
+                              <button
+                                key={category.id}
+                                onClick={() => {
+                                  handleCategoryClick(category.id);
+                                  setMobileMenuOpen(false);
+                                }}
+                                className="block w-full text-left py-2 px-4 rounded-md transition-colors text-primary-foreground/80 hover:bg-primary-foreground/10"
+                              >
+                                {category.name}
+                              </button>
+                            ))
+                          )}
                         </div>
                       ) : (
                         <Link
@@ -256,7 +326,7 @@ const Navbar = () => {
           "overflow-hidden transition-all duration-300 ease-in-out",
           searchOpen ? "max-h-16 opacity-100 mt-3" : "max-h-0 opacity-0"
         )}>
-          <div className="relative">
+          <form onSubmit={handleSearch} className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Rechercher des produits..."
@@ -264,15 +334,26 @@ const Navbar = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 pr-10 bg-primary-foreground border-0 rounded-full"
             />
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-              onClick={() => setSearchOpen(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+            <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-1">
+              <Button 
+                type="submit"
+                size="icon" 
+                variant="ghost"
+                className="h-8 w-8 hover:bg-accent hover:text-accent-foreground"
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+              <Button 
+                type="button"
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={() => setSearchOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </form>
         </div>
       </div>
     </nav>

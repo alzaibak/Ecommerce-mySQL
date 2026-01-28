@@ -1,238 +1,204 @@
-import { useNavigate } from 'react-router-dom';
+// src/components/client/ProductCard.tsx - UPDATED VERSION
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ShoppingCart, Eye, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ShoppingCart, Eye, Tag } from 'lucide-react';
 import { useAppDispatch } from '@/redux/hooks';
 import { addProduct } from '@/redux/cartSlice';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 interface ProductCardProps {
   product: {
     id: number;
     title: string;
     price: number;
-    discountPrice?: number;
+    discountPrice?: number | null;
     img: string;
-    inStock?: boolean;
-    attributes?: Record<string, any>;
-    stockByVariant?: Record<string, number>;
+    inStock: boolean;
+    attributes: Record<string, string[]>;
+    stockByVariant: Record<string, number>;
   };
-  index?: number;
 }
 
-const ProductCard = ({ product, index }: ProductCardProps) => {
-  const navigate = useNavigate();
+const ProductCard = ({ product }: ProductCardProps) => {
   const dispatch = useAppDispatch();
-  const { toast } = useToast();
+  const [isHovered, setIsHovered] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
 
-  const handleViewDetails = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    navigate(`/product/${product.id}`);
-  };
+  // Handle discount price - make sure it's a valid number
+  const discountPrice = product.discountPrice 
+    ? (typeof product.discountPrice === 'string' 
+        ? parseFloat(product.discountPrice) 
+        : product.discountPrice)
+    : null;
+    
+  const hasDiscount = discountPrice !== null && discountPrice > 0 && discountPrice < product.price;
+  const displayPrice = hasDiscount ? discountPrice : product.price;
+  
+  const discountPercentage = hasDiscount && discountPrice 
+    ? Math.round((1 - discountPrice / product.price) * 100)
+    : 0;
 
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  // Check if product has variants
+  const hasVariants = product.attributes && Object.keys(product.attributes).length > 0;
+  
+  // Calculate total stock
+  const totalStock = product.stockByVariant 
+    ? Object.values(product.stockByVariant).reduce((sum, qty) => sum + qty, 0)
+    : 0;
 
-    // For card quick-add, use default attributes or none
-    const defaultAttributes: Record<string, string> = {};
-    if (product.attributes) {
-      Object.entries(product.attributes).forEach(([key, values]) => {
-        if (Array.isArray(values) && values.length > 0) {
-          defaultAttributes[key] = values[0];
-        }
-      });
+  const handleAddToCart = () => {
+    if (!product.inStock) {
+      toast.error('Ce produit n\'est pas en stock');
+      return;
     }
 
+    if (hasVariants) {
+      // If product has variants, redirect to product page
+      window.location.href = `/product/${product.id}`;
+      return;
+    }
+
+    setIsAddingToCart(true);
+    
+    // Add to cart with default attributes
     dispatch(addProduct({
       id: product.id,
       title: product.title,
       price: product.price,
-      discountPrice: product.discountPrice,
-      img: product.img,
+      discountPrice: discountPrice || undefined,
       quantity: 1,
-      attributes: defaultAttributes,
+      img: product.img,
+      attributes: {},
+      variantKey: '',
       productId: product.id
     }));
 
-    toast({
-      title: "Ajouté au panier",
-      description: `${product.title} a été ajouté à votre panier`,
-    });
+    setTimeout(() => {
+      setIsAddingToCart(false);
+      toast.success(`${product.title} ajouté au panier`);
+    }, 300);
   };
-
-  // Calculate total stock across all variants
-  const totalStock = product.stockByVariant 
-    ? Object.values(product.stockByVariant).reduce((sum, stock) => sum + stock, 0)
-    : 0;
-
-  const isInStock = product.inStock !== false && totalStock > 0;
-  const hasDiscount = product.discountPrice && product.discountPrice < product.price;
-  const displayPrice = hasDiscount ? product.discountPrice! : product.price;
-  const discountPercentage = hasDiscount 
-    ? Math.round((1 - product.discountPrice! / product.price) * 100)
-    : 0;
-
-  // Safely get attribute values for preview
-  const getAttributePreview = () => {
-    if (!product.attributes) return [];
-    
-    const previewItems = [];
-    let itemCount = 0;
-    
-    for (const [key, values] of Object.entries(product.attributes)) {
-      // Check if values is an array
-      if (Array.isArray(values)) {
-        // Take first 2 values from each attribute
-        for (let i = 0; i < Math.min(values.length, 2); i++) {
-          if (itemCount < 3) { // Show max 3 preview items total
-            previewItems.push({
-              key,
-              value: values[i],
-              index: i
-            });
-            itemCount++;
-          }
-        }
-      }
-    }
-    
-    return previewItems;
-  };
-
-  const attributePreview = getAttributePreview();
-  const totalAttributeItems = product.attributes 
-    ? Object.values(product.attributes).flat().filter(v => Array.isArray(v) ? v.length : 1).length
-    : 0;
 
   return (
     <div 
-      className="group relative bg-card rounded-2xl overflow-hidden card-shadow transition-all duration-300 hover:-translate-y-1 hover:shadow-xl cursor-pointer"
-      style={{ animationDelay: `${(index || 0) * 100}ms` }}
-      onClick={handleViewDetails}
-      role="link"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          handleViewDetails(e as any);
-        }
-      }}
+      className="group relative bg-card rounded-xl overflow-hidden border border-border hover:border-accent transition-all duration-300 hover:shadow-xl"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Image Container */}
-      <div className="relative aspect-square overflow-hidden bg-muted">
-        <img
-          src={product.img}
-          alt={product.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-        />
-        
-        {/* Quick Actions Overlay */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-4">
-          <Button
-            size="icon"
-            variant="secondary"
-            className="rounded-full bg-background hover:bg-accent hover:text-accent-foreground"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleAddToCart(e);
-            }}
-            disabled={!isInStock}
-          >
-            <ShoppingCart className="h-5 w-5" />
-          </Button>
-          <Button
-            size="icon"
-            variant="secondary"
-            className="rounded-full bg-background hover:bg-accent hover:text-accent-foreground"
-            onClick={handleViewDetails}
-          >
-            <Eye className="h-5 w-5" />
-          </Button>
-        </div>
-
-        {/* Stock Badge */}
-        <div className="absolute top-4 left-4 z-10">
-          {isInStock ? (
-            <Badge className="bg-green-500 text-white">
-              En Stock
-            </Badge>
-          ) : (
-            <Badge className="bg-red-500 text-white">
-              Rupture
-            </Badge>
-          )}
-        </div>
-
-        {/* Discount Badge */}
-        {hasDiscount && (
-          <div className="absolute top-4 right-4 z-10">
-            <Badge className="bg-accent text-accent-foreground font-bold flex items-center gap-1">
-              <Tag className="h-3 w-3" />
-              -{discountPercentage}%
-            </Badge>
+      {/* Discount Badge */}
+      {hasDiscount && (
+        <div className="absolute top-3 left-3 z-10">
+          <div className="px-2 py-1 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
+            -{discountPercentage}%
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Out of Stock Badge */}
+      {!product.inStock && (
+        <div className="absolute top-3 right-3 z-10">
+          <div className="px-2 py-1 bg-muted text-muted-foreground text-xs font-medium rounded-full">
+            Rupture
+          </div>
+        </div>
+      )}
+
+      {/* Image Container */}
+      <Link to={`/product/${product.id}`} className="block">
+        <div className="relative overflow-hidden aspect-square bg-muted">
+          <img
+            src={product.img || '/placeholder-product.jpg'}
+            alt={product.title}
+            className={`w-full h-full object-cover transition-transform duration-500 ${
+              isHovered ? 'scale-110' : 'scale-100'
+            }`}
+          />
+          
+          {/* Quick View Overlay */}
+          <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-300 ${
+            isHovered ? 'opacity-100' : 'opacity-0'
+          }`}>
+            <Button 
+              size="icon" 
+              variant="secondary"
+              className="rounded-full bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+              asChild
+            >
+              <Link to={`/product/${product.id}`}>
+                <Eye className="h-5 w-5" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </Link>
 
       {/* Product Info */}
-      <div className="p-6">
-        <h3 className="text-lg font-semibold text-foreground mb-2 truncate">
-          {product.title}
-        </h3>
-        
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-accent">
-              €{displayPrice.toFixed(2)}
-            </span>
-            {hasDiscount && (
-              <span className="text-sm text-muted-foreground line-through">
-                €{product.price.toFixed(2)}
-              </span>
-            )}
-          </div>
-          
-          {/* Variant Count */}
-          {product.attributes && Object.keys(product.attributes).length > 0 && (
-            <span className="text-xs text-muted-foreground">
-              {Object.keys(product.attributes).length} option(s)
+      <div className="p-4 space-y-3">
+        {/* Title */}
+        <Link to={`/product/${product.id}`}>
+          <h3 className="font-semibold text-lg line-clamp-1 hover:text-accent transition-colors">
+            {product.title}
+          </h3>
+        </Link>
+
+        {/* Price */}
+        <div className="flex items-center gap-2">
+          <span className="text-xl font-bold">€{displayPrice?.toFixed(2)}</span>
+          {hasDiscount && (
+            <span className="text-sm text-muted-foreground line-through">
+              €{product.price.toFixed(2)}
             </span>
           )}
         </div>
 
-        {/* Attributes Preview */}
-        {attributePreview.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1">
-            {attributePreview.map((attr) => (
-              <span
-                key={`${attr.key}-${attr.value}-${attr.index}`}
-                className="px-2 py-1 text-xs rounded-full bg-accent/10 text-accent"
-              >
-                {attr.value}
-              </span>
-            ))}
-            {totalAttributeItems > attributePreview.length && (
-              <span className="px-2 py-1 text-xs text-muted-foreground">
-                +{totalAttributeItems - attributePreview.length}
-              </span>
-            )}
+        {/* Variant Indicator */}
+        {hasVariants && (
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <div className="w-2 h-2 rounded-full bg-accent animate-pulse"></div>
+            <span>{Object.keys(product.attributes).length} options</span>
           </div>
         )}
 
-        {/* Add to Cart Button */}
-        <Button
-          className="w-full mt-4 bg-accent hover:bg-accent/90 text-accent-foreground rounded-full"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleAddToCart(e);
-          }}
-          disabled={!isInStock}
-        >
-          <ShoppingCart className="h-4 w-4 mr-2" />
-          {isInStock ? 'Ajouter au panier' : 'Rupture de stock'}
-        </Button>
+        {/* Stock Indicator */}
+        <div className="flex items-center justify-between text-sm">
+          <div className={`flex items-center gap-1 ${
+            product.inStock ? 'text-green-600' : 'text-red-600'
+          }`}>
+            <div className={`w-2 h-2 rounded-full ${
+              product.inStock ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+            }`}></div>
+            <span>{product.inStock ? 'En stock' : 'Rupture'}</span>
+          </div>
+          {product.inStock && totalStock > 0 && (
+            <span className="text-muted-foreground">
+              {totalStock} dispo.
+            </span>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 pt-2">
+          <Button
+            className="flex-1 gap-2"
+            onClick={handleAddToCart}
+            disabled={!product.inStock || isAddingToCart}
+          >
+            <ShoppingCart className={`h-4 w-4 ${isAddingToCart ? 'animate-ping' : ''}`} />
+            {hasVariants ? 'Choisir' : 'Ajouter'}
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="icon"
+            className="hover:bg-accent hover:text-accent-foreground"
+            asChild
+          >
+            <Link to={`/product/${product.id}`}>
+              <Eye className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
       </div>
     </div>
   );

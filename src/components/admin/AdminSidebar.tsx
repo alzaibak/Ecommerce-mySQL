@@ -1,5 +1,5 @@
+// src/components/admin/AdminSidebar.tsx
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import {
   Sidebar,
   SidebarContent,
@@ -19,9 +19,13 @@ import {
   ShoppingCart, 
   LogOut,
   Settings,
-  FolderOpen
+  FolderOpen,
+  BarChart,
+  Home
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAppDispatch, useAppSelector } from '@/redux/hooks';
+import { logout } from '@/redux/userSlice';
 
 const menuItems = [
   { title: 'Dashboard', path: '/admin', icon: LayoutDashboard },
@@ -29,16 +33,18 @@ const menuItems = [
   { title: 'Products', path: '/admin/products', icon: Package },
   { title: 'Orders', path: '/admin/orders', icon: ShoppingCart },
   { title: 'Users', path: '/admin/users', icon: Users },
+  { title: 'Analytics', path: '/admin/analytics', icon: BarChart },
 ];
 
 export function AdminSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const dispatch = useAppDispatch();
+  const { currentUser } = useAppSelector((state) => state.user);
 
   const handleLogout = () => {
-    logout();
-    navigate('/admin/login');
+    dispatch(logout());
+    navigate('/');
   };
 
   return (
@@ -64,14 +70,24 @@ export function AdminSidebar() {
                 <SidebarMenuItem key={item.path}>
                   <SidebarMenuButton
                     onClick={() => navigate(item.path)}
-                    isActive={location.pathname === item.path}
-                    className="w-full"
+                    isActive={location.pathname === item.path || 
+                      (item.path !== '/admin' && location.pathname.startsWith(item.path))}
+                    className="w-full hover:bg-accent hover:text-accent-foreground"
                   >
                     <item.icon className="w-4 h-4" />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => navigate('/')}
+                  className="w-full hover:bg-accent hover:text-accent-foreground"
+                >
+                  <Home className="w-4 h-4" />
+                  <span>Back to Store</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -81,14 +97,14 @@ export function AdminSidebar() {
         <div className="flex items-center gap-3 mb-3">
           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
             <span className="text-sm font-medium text-muted-foreground">
-              {user?.firstName?.[0]}{user?.lastName?.[0]}
+              {currentUser?.userInfo.firstname?.[0]}{currentUser?.userInfo.lastname?.[0]}
             </span>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">
-              {user?.firstName} {user?.lastName}
+              {currentUser?.userInfo.firstname} {currentUser?.userInfo.lastname}
             </p>
-            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+            <p className="text-xs text-muted-foreground truncate">{currentUser?.userInfo.email}</p>
           </div>
         </div>
         <Button

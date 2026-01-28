@@ -3,19 +3,37 @@ const API_BASE_URL =
 
 import {store} from "../redux/store";
 
-/* ============================
-   SINGLE TOKEN SOURCE (REDUX)
-============================ */
-const getToken = () => {
-  return store.getState().user.token;
-};
 
 /* ============================
    FETCH WRAPPER
 ============================ */
+export const ensureNumericData = (data: any): any => {
+  if (Array.isArray(data)) {
+    return data.map(item => ensureNumericData(item));
+  }
+  
+  if (data && typeof data === 'object') {
+    const result: any = {};
+    for (const key in data) {
+      if (key === 'price' || key === 'subtotal' || key === 'shipping' || key === 'total' || key === 'amount') {
+        const val = data[key];
+        result[key] = typeof val === 'string' ? parseFloat(val) || 0 : val || 0;
+      } else if (Array.isArray(data[key])) {
+        result[key] = data[key].map((item: any) => ensureNumericData(item));
+      } else {
+        result[key] = data[key];
+      }
+    }
+    return result;
+  }
+  
+  return data;
+};
+
+// Then update your fetchAPI wrapper:
 export async function fetchAPI(
   endpoint: string,
-  options: RequestInit & { skipAuth?: boolean } = {}
+  options: RequestInit & { skipAuth?: boolean; skipNumericCheck?: boolean } = {}
 ) {
   const token = getToken();
 
@@ -43,8 +61,21 @@ export async function fetchAPI(
     };
   }
 
-  return response.json();
+  const data = await response.json();
+  
+  // Automatically convert numeric fields if not skipped
+  if (!options.skipNumericCheck) {
+    return ensureNumericData(data);
+  }
+  
+  return data;
 }
+/* ============================
+   SINGLE TOKEN SOURCE (REDUX)
+============================ */
+const getToken = () => {
+  return store.getState().user.token;
+};
 
 
 
@@ -64,7 +95,7 @@ export const authAPI = {
     fetchAPI("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
-      skipAuth: true, // 🔥 IMPORTANT
+      skipAuth: true,
     }),
 
   register: (data: any) =>
@@ -85,7 +116,7 @@ export const usersAPI = {
   getStats: () => fetchAPI('/users/stats'),
 };
 
-// lib/api.ts - Add Categories API
+// Categories API
 export const categoriesAPI = {
   getAll: () => fetchAPI('/categories'),
   getById: (id: number) => fetchAPI(`/categories/${id}`),
@@ -96,7 +127,7 @@ export const categoriesAPI = {
   delete: (id: number) => fetchAPI(`/categories/${id}`, { method: 'DELETE' }),
 };
 
-// Update productsAPI to include category management
+// Products API
 export const productsAPI = {
   getAll: (params?: { 
     new?: boolean; 
@@ -141,46 +172,168 @@ export const productsAPI = {
     }).then(res => res.json()),
 };
 
-
-// Orders API
+// Orders API - Updated with new methods
 export const ordersAPI = {
-  getAll: () => fetchAPI("/orders"),               // Admin only
-  getById: (id: number) => fetchAPI(`/orders/${id}`), // Admin or owner
+  getAll: (params?: {
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    userId?: number;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.userId) queryParams.append('userId', params.userId.toString());
+    
+    const query = queryParams.toString();
+    return fetchAPI(`/orders${query ? `?${query}` : ''}`);
+  },
+  getById: (id: number) => fetchAPI(`/orders/${id}`),
   getByPaymentIntent: (paymentIntentId: string) =>
     fetchAPI(`/orders/payment-intent/${paymentIntentId}`),
   getMyOrders: () => fetchAPI("/orders/user/orders"),
+  create: (data: Record<string, unknown>) =>
+    fetchAPI('/orders', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Record<string, unknown>) =>
-    fetchAPI(`/orders/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  delete: (id: number) => fetchAPI(`/orders/${id}`, { method: "DELETE" }),
+    fetchAPI(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) => fetchAPI(`/orders/${id}`, { method: 'DELETE' }),
   getIncome: () => fetchAPI("/orders/income"),
+  getStats: () => fetchAPI('/orders/stats'),
+  exportToCSV: (params?: { startDate?: string; endDate?: string }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    
+    const query = queryParams.toString();
+    return fetch(`${API_BASE_URL}/orders/export/csv${query ? `?${query}` : ''}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+      },
+    }).then(res => res.blob());
+  },
+  updateStatus: (id: number, status: string, note?: string) =>
+    fetchAPI(`/orders/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status, note })
+    }),
 };
 
-//order items
+// Order Items API - Updated with new methods
 export const orderItemsAPI = {
   getByOrder: (orderId: number) => fetchAPI(`/orders/items/order/${orderId}`),
   getById: (id: number) => fetchAPI(`/orders/items/${id}`),
+  create: (orderId: number, data: Record<string, unknown>) =>
+    fetchAPI(`/orders/${orderId}/items`, { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Record<string, unknown>) =>
-    fetchAPI(`/orders/items/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  delete: (id: number) => fetchAPI(`/orders/items/${id}`, { method: "DELETE" }),
+    fetchAPI(`/orders/items/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) => fetchAPI(`/orders/items/${id}`, { method: 'DELETE' }),
   getByProduct: (productId: number) => fetchAPI(`/orders/items/product/${productId}`),
+  batchUpdate: (orderId: number, items: Array<{
+    id?: number;
+    productId: number;
+    quantity: number;
+    price: number;
+    title: string;
+    attributes?: Record<string, any>;
+  }>) =>
+    fetchAPI(`/orders/${orderId}/items/batch`, {
+      method: 'POST',
+      body: JSON.stringify({ items })
+    }),
 };
 
 // Cart API
 export const cartAPI = {
   getAll: () => fetchAPI('/carts'),
   getByUser: (userId: number) => fetchAPI(`/carts/find/${userId}`),
+  update: (userId: number, data: Record<string, unknown>) =>
+    fetchAPI(`/carts/${userId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  clear: (userId: number) => fetchAPI(`/carts/${userId}/clear`, { method: 'PUT' }),
 };
 
 // Contact API
 export const contactAPI = {
+  getAll: () => fetchAPI('/contact'),
+  getById: (id: number) => fetchAPI(`/contact/${id}`),
   create: (data: Record<string, unknown>) =>
     fetchAPI('/contact', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: Record<string, unknown>) =>
+    fetchAPI(`/contact/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) => fetchAPI(`/contact/${id}`, { method: 'DELETE' }),
+  markAsRead: (id: number) =>
+    fetchAPI(`/contact/${id}/read`, { method: 'PUT' }),
 };
 
 // Stripe API
 export const stripeAPI = {
   create: (data: Record<string, unknown>) =>
     fetchAPI('/stripe/create-checkout-session', { method: 'POST', body: JSON.stringify(data) }),
+  webhook: (data: Record<string, unknown>) =>
+    fetchAPI('/stripe/webhook', { method: 'POST', body: JSON.stringify(data) }),
+  getPaymentMethods: () => fetchAPI('/stripe/payment-methods'),
+};
+
+// Dashboard API for aggregated stats
+export const dashboardAPI = {
+  getStats: () => fetchAPI('/dashboard/stats'),
+  getRecentOrders: (limit?: number) => {
+    const query = limit ? `?limit=${limit}` : '';
+    return fetchAPI(`/dashboard/recent-orders${query}`);
+  },
+  getTopProducts: (limit?: number) => {
+    const query = limit ? `?limit=${limit}` : '';
+    return fetchAPI(`/dashboard/top-products${query}`);
+  },
+  getSalesChartData: (period: 'day' | 'week' | 'month' | 'year') =>
+    fetchAPI(`/dashboard/sales-chart?period=${period}`),
+};
+
+// Export API for data export functionality
+export const exportAPI = {
+  orders: {
+    csv: (params?: { startDate?: string; endDate?: string }) => {
+      const queryParams = new URLSearchParams();
+      if (params?.startDate) queryParams.append('startDate', params.startDate);
+      if (params?.endDate) queryParams.append('endDate', params.endDate);
+      
+      const query = queryParams.toString();
+      return fetch(`${API_BASE_URL}/export/orders/csv${query ? `?${query}` : ''}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${getToken()}`,
+        },
+      }).then(res => res.blob());
+    },
+    pdf: (orderId: number) =>
+      fetch(`${API_BASE_URL}/export/orders/${orderId}/pdf`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${getToken()}`,
+        },
+      }).then(res => res.blob()),
+  },
+  products: {
+    csv: () =>
+      fetch(`${API_BASE_URL}/export/products/csv`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${getToken()}`,
+        },
+      }).then(res => res.blob()),
+  },
+};
+
+// Notification API
+export const notificationAPI = {
+  getAll: () => fetchAPI('/notifications'),
+  markAsRead: (id: number) =>
+    fetchAPI(`/notifications/${id}/read`, { method: 'PUT' }),
+  markAllAsRead: () =>
+    fetchAPI('/notifications/read-all', { method: 'PUT' }),
+  create: (data: Record<string, unknown>) =>
+    fetchAPI('/notifications', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 export default api;
