@@ -7,20 +7,37 @@ import { Separator } from '@/components/ui/separator';
 import { useAppSelector, useAppDispatch } from '@/redux/hooks';
 import { increaseQuantity, decreaseQuantity, removeProduct } from '@/redux/cartSlice';
 
+export interface CartProduct {
+  id: number;
+  variantKey?: string;
+  title: string;
+  price: number;
+  discountPrice?: number;
+  quantity: number;
+  img: string;
+  attributes?: Record<string, string>;
+}
+
 const CartPage = () => {
   const dispatch = useAppDispatch();
   const { products: cartItems, quantity: cartQuantity, total } = useAppSelector((state) => state.cart);
 
-  const handleIncrease = (item: { _id: string; color?: string; size?: string }) => {
-    dispatch(increaseQuantity({ _id: item._id, color: item.color, size: item.size }));
+  const handleIncrease = (item: { id: number; variantKey?: string }) => {
+    dispatch(increaseQuantity({ id: item.id, variantKey: item.variantKey }));
   };
 
-  const handleDecrease = (item: { _id: string; color?: string; size?: string }) => {
-    dispatch(decreaseQuantity({ _id: item._id, color: item.color, size: item.size }));
+  const handleDecrease = (item: { id: number; variantKey?: string }) => {
+    dispatch(decreaseQuantity({ id: item.id, variantKey: item.variantKey }));
   };
 
-  const handleRemove = (item: { _id: string; color?: string; size?: string; title: string }) => {
-    dispatch(removeProduct({ _id: item._id, color: item.color, size: item.size, title: item.title }));
+  const handleRemove = (item: { id: number; variantKey?: string; title: string }) => {
+    dispatch(removeProduct({ id: item.id, variantKey: item.variantKey, title: item.title }));
+  };
+
+  const getProductPrice = (product: any) => {
+    return product.discountPrice && product.discountPrice < product.price 
+      ? product.discountPrice 
+      : product.price;
   };
 
   const shipping = total > 100 ? 0 : 9.99;
@@ -71,67 +88,86 @@ const CartPage = () => {
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
-              {cartItems.map((item, index) => (
-                <div
-                  key={`${item._id}-${item.color}-${item.size}-${index}`}
-                  className="bg-card border border-border rounded-xl p-4 flex gap-4 card-shadow"
-                >
-                  <div className="w-24 h-24 md:w-32 md:h-32 rounded-lg overflow-hidden bg-secondary/50 flex-shrink-0">
-                    <img
-                      src={item.img}
-                      alt={item.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-
-                  <div className="flex-1 flex flex-col justify-between">
-                    <div>
-                      <h3 className="font-semibold text-lg">{item.title}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {item.size && `Taille: ${item.size}`}
-                        {item.size && item.color && ' | '}
-                        {item.color && `Couleur: ${item.color}`}
-                      </p>
+              {cartItems.map((item, index) => {
+                const productPrice = getProductPrice(item);
+                const attributes = item.attributes || {};
+                
+                return (
+                  <div
+                    key={`${item.id}-${item.variantKey || index}`}
+                    className="bg-card border border-border rounded-xl p-4 flex gap-4 card-shadow"
+                  >
+                    <div className="w-24 h-24 md:w-32 md:h-32 rounded-lg overflow-hidden bg-secondary/50 flex-shrink-0">
+                      <img
+                        src={item.img}
+                        alt={item.title}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
 
-                    <div className="flex items-center justify-between mt-2">
-                      <div className="flex items-center gap-2 bg-secondary rounded-full p-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-full"
-                          onClick={() => handleDecrease(item)}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <span className="w-8 text-center font-medium">{item.quantity}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-full"
-                          onClick={() => handleIncrease(item)}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                    <div className="flex-1 flex flex-col justify-between">
+                      <div>
+                        <h3 className="font-semibold text-lg">{item.title}</h3>
+                        {Object.keys(attributes).length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {Object.entries(attributes).map(([key, value]) => (
+                              <p key={key} className="text-sm text-muted-foreground">
+                                <span className="capitalize">{key}</span>: {value}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                        {item.discountPrice && item.discountPrice < item.price && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="text-lg font-bold text-accent">
+                              €{item.discountPrice.toFixed(2)}
+                            </span>
+                            <span className="text-sm text-muted-foreground line-through">
+                              €{item.price.toFixed(2)}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-4">
-                        <span className="font-bold text-lg">
-                          €{(item.price * item.quantity).toFixed(2)}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => handleRemove(item)}
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </Button>
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="flex items-center gap-2 bg-secondary rounded-full p-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full"
+                            onClick={() => handleDecrease(item)}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <span className="w-8 text-center font-medium">{item.quantity}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full"
+                            onClick={() => handleIncrease(item)}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                          <span className="font-bold text-lg">
+                            €{(productPrice * item.quantity).toFixed(2)}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleRemove({ ...item, title: item.title })}
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               <Link to="/products" className="inline-flex items-center gap-2 text-accent hover:underline mt-4 font-medium">
                 <ArrowLeft className="h-4 w-4" />
@@ -168,7 +204,21 @@ const CartPage = () => {
                 </div>
 
                 <div className="mt-6">
-                  <PayButton cartItems={cartItems} total={total} />
+                  <PayButton
+                      cartItems={cartItems.map(item => ({
+                        id: item.id,
+                        variantKey: item.variantKey || '',
+                        title: item.title,
+                        price: getProductPrice(item),
+                        discountPrice: item.discountPrice,
+                        quantity: item.quantity,
+                        img: item.img,
+                        attributes: item.attributes || {}
+                      }))}
+                      subtotal={total}
+                      shipping={shipping}
+                      total={grandTotal}
+                    />
                 </div>
               </div>
             </div>

@@ -2,13 +2,16 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { toast } from "sonner";
 
 export interface CartProduct {
-  _id: string;
+  id: number; // Changed from _id to id (number to match MySQL model)
   title: string;
   price: number;
+  discountPrice?: number; // Added discount price
   quantity: number;
   img: string;
-  color?: string;
-  size?: string;
+  // Store attributes as object for variant management
+  attributes: Record<string, string>;
+  variantKey?: string;
+  productId: number;
 }
 
 interface CartState {
@@ -28,65 +31,79 @@ const cartSlice = createSlice({
   initialState,
   reducers: {
     addProduct(state, action: PayloadAction<CartProduct>) {
+      const product = action.payload;
+      const variantKey = product.variantKey || Object.values(product.attributes).join('_');
+      
+      // Find existing product with same id and attributes
       const productIndex = state.products.findIndex(
-        (item) =>
-          item._id === action.payload._id &&
-          item.color === action.payload.color &&
-          item.size === action.payload.size
+        (item) => 
+          item.id === product.id && 
+          item.variantKey === variantKey
       );
 
       if (productIndex >= 0) {
-        state.products[productIndex].quantity += action.payload.quantity;
-        toast.info(`Quantité ${action.payload.quantity} ajoutée au panier`);
+        state.products[productIndex].quantity += product.quantity;
+        toast.info(`Quantité ${product.quantity} ajoutée au panier`);
       } else {
-        state.products.push(action.payload);
+        state.products.push({ ...product, variantKey });
         state.quantity += 1;
-        toast.success(`${action.payload.title} ajouté au panier`);
+        toast.success(`${product.title} ajouté au panier`);
       }
-      state.total += action.payload.price * action.payload.quantity;
+      
+      // Use discount price if available, otherwise use regular price
+      const productPrice = product.discountPrice && product.discountPrice < product.price 
+        ? product.discountPrice 
+        : product.price;
+      state.total += productPrice * product.quantity;
     },
 
-    increaseQuantity(state, action: PayloadAction<{ _id: string; color?: string; size?: string }>) {
+    increaseQuantity(state, action: PayloadAction<{ id: number; variantKey?: string }>) {
+      const { id, variantKey } = action.payload;
       const productIndex = state.products.findIndex(
-        (item) =>
-          item._id === action.payload._id &&
-          item.color === action.payload.color &&
-          item.size === action.payload.size
+        (item) => item.id === id && item.variantKey === variantKey
       );
 
       if (productIndex >= 0) {
         state.products[productIndex].quantity += 1;
-        state.total += state.products[productIndex].price;
+        const productPrice = state.products[productIndex].discountPrice && 
+          state.products[productIndex].discountPrice! < state.products[productIndex].price
+          ? state.products[productIndex].discountPrice!
+          : state.products[productIndex].price;
+        state.total += productPrice;
       }
     },
 
-    decreaseQuantity(state, action: PayloadAction<{ _id: string; color?: string; size?: string }>) {
+    decreaseQuantity(state, action: PayloadAction<{ id: number; variantKey?: string }>) {
+      const { id, variantKey } = action.payload;
       const productIndex = state.products.findIndex(
-        (item) =>
-          item._id === action.payload._id &&
-          item.color === action.payload.color &&
-          item.size === action.payload.size
+        (item) => item.id === id && item.variantKey === variantKey
       );
 
       if (productIndex >= 0 && state.products[productIndex].quantity > 1) {
         state.products[productIndex].quantity -= 1;
-        state.total -= state.products[productIndex].price;
+        const productPrice = state.products[productIndex].discountPrice && 
+          state.products[productIndex].discountPrice! < state.products[productIndex].price
+          ? state.products[productIndex].discountPrice!
+          : state.products[productIndex].price;
+        state.total -= productPrice;
       }
     },
 
-    removeProduct(state, action: PayloadAction<{ _id: string; color?: string; size?: string; title: string }>) {
+    removeProduct(state, action: PayloadAction<{ id: number; variantKey?: string; title: string }>) {
+      const { id, variantKey, title } = action.payload;
       const productIndex = state.products.findIndex(
-        (item) =>
-          item._id === action.payload._id &&
-          item.color === action.payload.color &&
-          item.size === action.payload.size
+        (item) => item.id === id && item.variantKey === variantKey
       );
 
       if (productIndex >= 0) {
-        state.total -= state.products[productIndex].price * state.products[productIndex].quantity;
+        const product = state.products[productIndex];
+        const productPrice = product.discountPrice && product.discountPrice < product.price
+          ? product.discountPrice
+          : product.price;
+        state.total -= productPrice * product.quantity;
         state.quantity -= 1;
         state.products.splice(productIndex, 1);
-        toast.error(`${action.payload.title} supprimé du panier`);
+        toast.error(`${title} supprimé du panier`);
       }
     },
 

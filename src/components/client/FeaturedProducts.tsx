@@ -3,15 +3,18 @@ import ProductCard from './ProductCard';
 import { Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import api from '@/lib/api';
+import { productsAPI } from '@/lib/api';
 
 interface Product {
-  _id: string;
+  id: number;
   title: string;
   price: number;
+  discountPrice?: number;
   img: string;
-  discount?: number;
-  inStock?: boolean;
+  inStock: boolean;
+  attributes: Record<string, string[]>;
+  stockByVariant: Record<string, number>;
+  createdAt: string;
 }
 
 const FeaturedProducts = () => {
@@ -21,17 +24,16 @@ const FeaturedProducts = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        // Fetch newest/featured products
-        const response = await api.get('/products?new=true');
-        console.log('FeaturedProducts API response:', response);
-        // Handle response - backend returns array directly
+        const response = await productsAPI.getAll({ new: true });
         const productsArray = Array.isArray(response) ? response : response.data || [];
-        console.log('FeaturedProducts processed array:', productsArray);
-        // Take first 8 products
-        setProducts(productsArray.slice(0, 8));
+        // Sort by creation date and take first 8
+        const sortedProducts = productsArray
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 8);
+        setProducts(sortedProducts);
       } catch (error) {
         console.error('Error fetching products:', error);
-        setProducts([]); // Set empty array on error
+        setProducts([]);
       } finally {
         setLoading(false);
       }
@@ -57,13 +59,13 @@ const FeaturedProducts = () => {
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 text-accent text-sm font-medium mb-4">
             <Sparkles className="h-4 w-4" />
-            Sélection spéciale
+            Nouveautés
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Produits <span className="text-gradient">Vedettes</span>
+            Nos <span className="text-gradient">Nouveautés</span>
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Découvrez notre sélection de produits populaires et tendance
+            Découvrez nos derniers ajouts et produits tendance
           </p>
         </div>
 
@@ -71,13 +73,25 @@ const FeaturedProducts = () => {
         {products.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-muted-foreground">
-              Aucun produit disponible pour le moment.
+              Aucun nouveau produit disponible pour le moment.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {products.map((product, index) => (
-              <ProductCard key={product._id} product={product} index={index} />
+            {products.map((product) => (
+              <ProductCard 
+                key={product.id} 
+                product={{
+                  id: product.id,
+                  title: product.title,
+                  price: product.price,
+                  discountPrice: product.discountPrice,
+                  img: product.img,
+                  inStock: product.inStock,
+                  attributes: product.attributes,
+                  stockByVariant: product.stockByVariant
+                }} 
+              />
             ))}
           </div>
         )}

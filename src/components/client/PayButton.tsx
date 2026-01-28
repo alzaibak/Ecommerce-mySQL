@@ -2,23 +2,26 @@
 import { useState } from 'react';
 import { CreditCard, Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import api from '@/lib/api';
+import { stripeAPI } from '@/lib/api';
 import { useAppSelector } from '@/redux/hooks';
 import { useNavigate } from 'react-router-dom';
 
 interface CartItem {
-  _id: string;
+  id: number;
+  variantKey?: string;
   title: string;
   price: number;
+  discountPrice?: number;
   quantity: number;
   img: string;
+  attributes?: Record<string, string>;
 }
 
 interface PayButtonProps {
   cartItems: CartItem[];
-  subtotal: number; // Sous-total des produits
-  shipping: number; // Frais de livraison
-  total: number; // Total final
+  subtotal: number;
+  shipping: number;
+  total: number;
   disabled?: boolean;
 }
 
@@ -30,30 +33,29 @@ const PayButton = ({ cartItems, subtotal, shipping, total, disabled }: PayButton
   const handlePayment = async () => {
     // Check if user is logged in
     if (!user) {
-      // Redirect to login with a "redirect back to cart" state
       navigate("/login", { state: { from: "/cart" } });
       return;
     }
 
     setLoading(true);
     try {
-      const data = await api.post('/stripe/create-checkout-session', { 
+      const data = await stripeAPI.create({ 
         cartItems, 
-        subtotal,
-        shipping,
-        total,
+        total: subtotal, // Send subtotal (products only)
         email: user.userInfo.email,
-        userId: user.userInfo._id,
+        userId: user.userInfo._id || user.userInfo._id,
       });
 
       if (data?.url) {
         window.location.href = data.url;
       } else {
         console.error('Stripe session URL missing', data);
+        alert('Erreur: Impossible de créer la session de paiement');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Payment error:', error);
-      alert('Erreur lors de la création du paiement. Veuillez réessayer.');
+      const message = error?.message || 'Erreur lors de la création du paiement. Veuillez réessayer.';
+      alert(message);
     } finally {
       setLoading(false);
     }

@@ -13,8 +13,8 @@ const authenticationUser = require("./routes/authentication");
 const stripeRoute = require("./routes/stripe");
 const stripeWebhook = require("./routes/stripeWebhook");
 const contact = require("./routes/contact");
-
-dotenv.config();
+const categoryRoutes = require('./routes/categories'); 
+// In your main server file
 
 // ⚠️ Stripe webhook must be first
 app.post(
@@ -31,11 +31,14 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use("/api/auth", authenticationUser);
 app.use("/api/users", userRoute);
+app.use("/api/categories", categoryRoutes);
 app.use("/api/products", productRoute);
 app.use("/api/cart", cartRoute);
 app.use("/api/orders", orderRoute);
 app.use("/api/stripe", stripeRoute);
 app.use("/api/contact", contact);
+app.use("/api/contact", contact);
+
 
 // Database connection
 sequelize

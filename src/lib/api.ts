@@ -85,12 +85,33 @@ export const usersAPI = {
   getStats: () => fetchAPI('/users/stats'),
 };
 
-// Products API
+// lib/api.ts - Add Categories API
+export const categoriesAPI = {
+  getAll: () => fetchAPI('/categories'),
+  getById: (id: number) => fetchAPI(`/categories/${id}`),
+  create: (data: Record<string, unknown>) => 
+    fetchAPI('/categories', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: Record<string, unknown>) =>
+    fetchAPI(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) => fetchAPI(`/categories/${id}`, { method: 'DELETE' }),
+};
+
+// Update productsAPI to include category management
 export const productsAPI = {
-  getAll: (params?: { new?: boolean; category?: string }) => {
+  getAll: (params?: { 
+    new?: boolean; 
+    category?: string | number;
+    featured?: boolean;
+    limit?: number;
+    page?: number;
+  }) => {
     const queryParams = new URLSearchParams();
     if (params?.new) queryParams.append('new', 'true');
-    if (params?.category) queryParams.append('category', params.category);
+    if (params?.category) queryParams.append('category', params.category.toString());
+    if (params?.featured) queryParams.append('featured', 'true');
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.page) queryParams.append('page', params.page.toString());
+    
     const query = queryParams.toString();
     return fetchAPI(`/products${query ? `?${query}` : ''}`);
   },
@@ -100,7 +121,26 @@ export const productsAPI = {
   update: (id: number, data: Record<string, unknown>) =>
     fetchAPI(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) => fetchAPI(`/products/${id}`, { method: 'DELETE' }),
+  updateAttributes: (id: number, attributes: Record<string, any>) =>
+    fetchAPI(`/products/${id}/attributes`, { 
+      method: 'PUT', 
+      body: JSON.stringify({ attributes }) 
+    }),
+  updateVariantStock: (id: number, stockByVariant: Record<string, number>) =>
+    fetchAPI(`/products/${id}/stock-by-variant`, {
+      method: 'PUT',
+      body: JSON.stringify({ stockByVariant })
+    }),
+  uploadImage: (formData: FormData) =>
+    fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+      },
+    }).then(res => res.json()),
 };
+
 
 // Orders API
 export const ordersAPI = {
@@ -115,6 +155,15 @@ export const ordersAPI = {
   getIncome: () => fetchAPI("/orders/income"),
 };
 
+//order items
+export const orderItemsAPI = {
+  getByOrder: (orderId: number) => fetchAPI(`/orders/items/order/${orderId}`),
+  getById: (id: number) => fetchAPI(`/orders/items/${id}`),
+  update: (id: number, data: Record<string, unknown>) =>
+    fetchAPI(`/orders/items/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  delete: (id: number) => fetchAPI(`/orders/items/${id}`, { method: "DELETE" }),
+  getByProduct: (productId: number) => fetchAPI(`/orders/items/product/${productId}`),
+};
 
 // Cart API
 export const cartAPI = {

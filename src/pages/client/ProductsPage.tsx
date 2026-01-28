@@ -15,7 +15,7 @@ const ProductsPage = () => {
             </h1>
             <div className="w-24 h-1 bg-accent mx-auto rounded-full" />
           </div>
-          <AllProducts category={category} />
+          <AllProducts />
         </div>
       </section>
     </ClientLayout>

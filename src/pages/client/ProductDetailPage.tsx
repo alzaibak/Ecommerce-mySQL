@@ -12,24 +12,30 @@ import {
   Truck, 
   RotateCcw, 
   Shield,
-  Loader2
+  Loader2,
+  Palette,
+  Ruler,
+  Tag
 } from 'lucide-react';
 import { useAppDispatch } from '@/redux/hooks';
 import { addProduct } from '@/redux/cartSlice';
 import { useToast } from '@/hooks/use-toast';
-import api from '@/lib/api';
+import { productsAPI } from '@/lib/api';
 
 interface Product {
-  _id: string;
+  id: number;
   title: string;
-  desc?: string;
+  description?: string;
   price: number;
+  discountPrice?: number;
   img: string;
-  categories?: string[];
-  size?: string[];
-  color?: string[];
-  discount?: number;
   inStock?: boolean;
+  attributes?: {
+    [key: string]: string[];
+  };
+  stockByVariant?: {
+    [key: string]: number;
+  };
 }
 
 const ProductDetailPage = () => {
@@ -39,17 +45,25 @@ const ProductDetailPage = () => {
   
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedSize, setSelectedSize] = useState('');
-  const [selectedColor, setSelectedColor] = useState('');
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     const fetchProduct = async () => {
       try {
-        const response = await api.get(`/products/find/${id}`);
+        const response = await productsAPI.getById(Number(id));
         setProduct(response);
-        if (response.size?.length) setSelectedSize(response.size[0]);
-        if (response.color?.length) setSelectedColor(response.color[0]);
+        
+        // Initialize selected attributes with first available values
+        if (response.attributes) {
+          const initialAttributes: Record<string, string> = {};
+          Object.entries(response.attributes).forEach(([key, value]) => {
+            if (Array.isArray(value) && value.length > 0) {
+              initialAttributes[key] = value[0];
+            }
+          });
+          setSelectedAttributes(initialAttributes);
+        }
       } catch (error) {
         console.error('Error fetching product:', error);
       } finally {
@@ -59,25 +73,87 @@ const ProductDetailPage = () => {
     fetchProduct();
   }, [id]);
 
+  // Generate variant key from selected attributes
+  const generateVariantKey = (attrs: Record<string, string>) => {
+    return Object.keys(attrs)
+      .sort()
+      .map(key => attrs[key])
+      .join('_');
+  };
+
+  // Get stock for current variant
+  const getCurrentVariantStock = () => {
+    if (!product || !product.stockByVariant || Object.keys(selectedAttributes).length === 0) {
+      return 0;
+    }
+    const variantKey = generateVariantKey(selectedAttributes);
+    return product.stockByVariant[variantKey] || 0;
+  };
+
   const handleAddToCart = () => {
     if (!product) return;
     
+    const currentStock = getCurrentVariantStock();
+    
+    // Check if variant is in stock
+    if (currentStock < quantity) {
+      toast({
+        title: "Stock insuffisant",
+        description: `Il ne reste que ${currentStock} unité(s) de ce variant`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Check if any variant is selected
+    if (Object.keys(selectedAttributes).length === 0) {
+      toast({
+        title: "Sélection requise",
+        description: "Veuillez sélectionner les options du produit",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const variantKey = generateVariantKey(selectedAttributes);
+    
     dispatch(addProduct({
-      ...product,
+      id: product.id,
+      title: product.title,
+      price: product.price,
+      discountPrice: product.discountPrice,
+      img: product.img,
       quantity,
-      color: selectedColor,
-      size: selectedSize,
+      attributes: { ...selectedAttributes },
+      variantKey,
+      productId: product.id
     }));
     
     toast({
       title: "Ajouté au panier",
-      description: `${product.title} a été ajouté à votre panier`,
+      description: `${product.title} (${Object.values(selectedAttributes).join(', ')}) a été ajouté à votre panier`,
     });
   };
 
-  const discountedPrice = product?.discount 
-    ? product.price * (1 - product.discount / 100) 
-    : null;
+  const handleAttributeChange = (attributeName: string, value: string) => {
+    const newAttributes = {
+      ...selectedAttributes,
+      [attributeName]: value
+    };
+    setSelectedAttributes(newAttributes);
+  };
+
+  const attributeIcons: Record<string, React.ReactNode> = {
+    size: <Ruler className="h-4 w-4" />,
+    color: <Palette className="h-4 w-4" />,
+    material: <Palette className="h-4 w-4" />,
+  };
+
+  const attributeLabels: Record<string, string> = {
+    size: 'Taille',
+    color: 'Couleur',
+    material: 'Matériau',
+  };
 
   if (loading) {
     return (
@@ -104,6 +180,14 @@ const ProductDetailPage = () => {
     );
   }
 
+  const hasDiscount = product.discountPrice && product.discountPrice < product.price;
+  const displayPrice = hasDiscount ? product.discountPrice! : product.price;
+  const discountPercentage = hasDiscount 
+    ? Math.round((1 - product.discountPrice! / product.price) * 100)
+    : 0;
+  const currentStock = getCurrentVariantStock();
+  const isVariantInStock = currentStock > 0;
+
   return (
     <ClientLayout>
       <div className="container mx-auto px-4 py-8">
@@ -121,13 +205,16 @@ const ProductDetailPage = () => {
           <div className="relative bg-card rounded-2xl overflow-hidden card-shadow">
             {/* Badges */}
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-              {product.discount && (
-                <Badge className="bg-accent hover:bg-accent text-accent-foreground font-bold text-sm px-3 py-1">
-                  -{product.discount}%
+              {hasDiscount && (
+                <Badge className="bg-accent text-accent-foreground font-bold flex items-center gap-1">
+                  <Tag className="h-3 w-3" />
+                  -{discountPercentage}%
                 </Badge>
               )}
-              {product.inStock && (
+              {product.inStock ? (
                 <Badge className="bg-green-500 text-white">En Stock</Badge>
+              ) : (
+                <Badge className="bg-red-500 text-white">Rupture de stock</Badge>
               )}
             </div>
             
@@ -150,17 +237,6 @@ const ProductDetailPage = () => {
 
           {/* Product Info */}
           <div className="space-y-6">
-            {/* Category */}
-            {product.categories?.length && (
-              <div className="flex gap-2">
-                {product.categories.map((cat) => (
-                  <Badge key={cat} variant="outline" className="text-xs capitalize">
-                    {cat}
-                  </Badge>
-                ))}
-              </div>
-            )}
-
             {/* Title */}
             <h1 className="text-3xl md:text-4xl font-bold text-foreground">
               {product.title}
@@ -169,67 +245,81 @@ const ProductDetailPage = () => {
             {/* Price */}
             <div className="flex items-center gap-4">
               <span className="text-3xl font-bold text-foreground">
-                €{(discountedPrice ?? product.price).toFixed(2)}
+                €{displayPrice.toFixed(2)}
               </span>
-              {discountedPrice && (
-                <span className="text-xl text-muted-foreground line-through">
-                  €{product.price.toFixed(2)}
-                </span>
+              {hasDiscount && (
+                <>
+                  <span className="text-xl text-muted-foreground line-through">
+                    €{product.price.toFixed(2)}
+                  </span>
+                  <Badge variant="outline" className="text-accent border-accent">
+                    Économisez {discountPercentage}%
+                  </Badge>
+                </>
               )}
             </div>
 
             {/* Description */}
-            {product.desc && (
+            {product.description && (
               <p className="text-muted-foreground leading-relaxed">
-                {product.desc}
+                {product.description}
               </p>
             )}
 
-            {/* Color Selection */}
-            {product.color && product.color.length > 0 && (
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-foreground">
-                  Couleur: <span className="text-accent capitalize">{selectedColor}</span>
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {product.color.map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => setSelectedColor(color)}
-                      className={`px-4 py-2 rounded-full border-2 transition-all capitalize text-sm ${
-                        selectedColor === color
-                          ? 'border-accent bg-accent/10 text-accent'
-                          : 'border-border hover:border-accent/50'
-                      }`}
-                    >
-                      {color}
-                    </button>
-                  ))}
-                </div>
+            {/* Dynamic Attributes */}
+            {product.attributes && Object.keys(product.attributes).length > 0 && (
+              <div className="space-y-4">
+                {Object.entries(product.attributes).map(([attributeName, options]) => {
+                  if (!Array.isArray(options) || options.length === 0) return null;
+                  
+                  const icon = attributeIcons[attributeName] || null;
+                  const label = attributeLabels[attributeName] || 
+                    attributeName.charAt(0).toUpperCase() + attributeName.slice(1);
+                  
+                  return (
+                    <div key={attributeName} className="space-y-3">
+                      <label className="text-sm font-medium text-foreground flex items-center gap-2">
+                        {icon}
+                        {label}: 
+                        <span className="text-accent capitalize">
+                          {selectedAttributes[attributeName]}
+                        </span>
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {options.map((option: string) => (
+                          <button
+                            key={option}
+                            onClick={() => handleAttributeChange(attributeName, option)}
+                            className={`px-4 py-2 rounded-full border-2 transition-all capitalize text-sm ${
+                              selectedAttributes[attributeName] === option
+                                ? 'border-accent bg-accent/10 text-accent'
+                                : 'border-border hover:border-accent/50'
+                            }`}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
-            {/* Size Selection */}
-            {product.size && product.size.length > 0 && (
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-foreground">
-                  Taille: <span className="text-accent">{selectedSize}</span>
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {product.size.map((size) => (
-                    <button
-                      key={size}
-                      onClick={() => setSelectedSize(size)}
-                      className={`w-12 h-12 rounded-lg border-2 font-medium transition-all ${
-                        selectedSize === size
-                          ? 'border-accent bg-accent text-accent-foreground'
-                          : 'border-border hover:border-accent/50'
-                      }`}
-                    >
-                      {size}
-                    </button>
-                  ))}
-                </div>
+            {/* Stock information for selected variant */}
+            {Object.keys(selectedAttributes).length > 0 && (
+              <div className="p-4 bg-card rounded-lg border">
+                <p className="text-sm font-medium">
+                  Stock pour {Object.values(selectedAttributes).join(', ')}: 
+                  <span className={`ml-2 ${isVariantInStock ? 'text-green-500' : 'text-red-500'}`}>
+                    {isVariantInStock ? `${currentStock} disponible(s)` : 'Rupture de stock'}
+                  </span>
+                </p>
+                {!isVariantInStock && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Ce variant n'est actuellement pas disponible
+                  </p>
+                )}
               </div>
             )}
 
@@ -243,6 +333,7 @@ const ProductDetailPage = () => {
                     size="icon"
                     className="rounded-full"
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    disabled={!isVariantInStock}
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
@@ -252,10 +343,16 @@ const ProductDetailPage = () => {
                     size="icon"
                     className="rounded-full"
                     onClick={() => setQuantity(quantity + 1)}
+                    disabled={!isVariantInStock || quantity >= currentStock}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
+                {isVariantInStock && currentStock > 0 && (
+                  <span className="text-sm text-muted-foreground">
+                    {currentStock} disponible(s)
+                  </span>
+                )}
               </div>
             </div>
 
@@ -265,9 +362,10 @@ const ProductDetailPage = () => {
                 size="lg"
                 className="flex-1 bg-accent hover:bg-accent/90 text-accent-foreground rounded-full font-semibold text-lg"
                 onClick={handleAddToCart}
+                disabled={!isVariantInStock || Object.keys(selectedAttributes).length === 0}
               >
                 <ShoppingCart className="h-5 w-5 mr-2" />
-                Ajouter au panier
+                {isVariantInStock ? 'Ajouter au panier' : 'Indisponible'}
               </Button>
               <Button
                 size="lg"

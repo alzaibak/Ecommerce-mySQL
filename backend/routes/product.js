@@ -166,4 +166,51 @@ router.get("/", async (req, res) => {
     }
 });
 
+// routes/products.js - Ajout de nouvelles routes
+// ... routes existantes ...
+
+// Update product attributes
+router.put("/:id/attributes", tokenVerificationAndAuthorization, async (req, res) => {
+  try {
+    const { attributes } = req.body;
+    
+    // Récupérer le produit
+    const product = await Product.findByPk(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    
+    // Mettre à jour les attributs
+    await product.update({ attributes });
+    
+    res.status(200).json(transformProduct(product));
+  } catch (error) {
+    res.status(500).json(error);
+  }
+});
+
+// Update stock by attribute
+router.put("/:id/stock-by-attribute", tokenVerificationAndAuthorization, async (req, res) => {
+  try {
+    const { stockByAttribute } = req.body;
+    
+    const product = await Product.findByPk(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    
+    await product.update({ stockByAttribute });
+    
+    // Vérifier si le produit est toujours en stock
+    if (stockByAttribute) {
+      const totalStock = Object.values(stockByAttribute).reduce((a, b) => a + b, 0);
+      await product.update({ inStock: totalStock > 0 });
+    }
+    
+    res.status(200).json(transformProduct(product));
+  } catch (error) {
+    res.status(500).json(error);
+  }
+});
+
 module.exports = router;

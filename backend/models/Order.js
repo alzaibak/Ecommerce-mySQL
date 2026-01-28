@@ -1,73 +1,58 @@
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/database');
+const sequelize = require('../config/database'); // Use the configured instance
 
 const Order = sequelize.define('Order', {
-    id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true
-    },
-    userId: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        references: {
-            model: 'users',
-            key: 'id'
-        }
-    },
-    customerId: {
-        type: DataTypes.STRING(255),
-        allowNull: true
-    },
-    paymentIntentId: {
-        type: DataTypes.STRING(255),
-        allowNull: true
-    },
-    orderNumber: {
-        type: DataTypes.STRING(6),
-        allowNull: false,
-        unique: true
-    },
-    products: {
-        type: DataTypes.JSON,
-        allowNull: false
-    },
-    amount: {
-        type: DataTypes.DECIMAL(10, 2),
-        allowNull: false,
-        validate: {
-            min: 0
-        }
-    },
-    shipping: {
-        type: DataTypes.DECIMAL(10, 2),
-        allowNull: false,
-        defaultValue: 0.00,
-        validate: {
-            min: 0
-        }
-    },
-    address: {
-        type: DataTypes.JSON,
-        allowNull: true
-    },
-    status: {
-        type: DataTypes.ENUM('pending', 'confirmed', 'processing', 'shipped', 'livred', 'delivered', 'cancelled'),
-        defaultValue: 'pending'
-    }
+  id: { 
+    type: DataTypes.INTEGER, 
+    primaryKey: true, 
+    autoIncrement: true 
+  },
+  userId: { 
+    type: DataTypes.INTEGER, 
+    allowNull: false 
+  },
+  orderNumber: { 
+    type: DataTypes.STRING(10), 
+    unique: true 
+  },
+  paymentIntentId: { 
+    type: DataTypes.STRING 
+  },
+  status: {
+    type: DataTypes.ENUM(
+      'pending',
+      'paid',
+      'processing',
+      'shipped',
+      'delivered',
+      'cancelled',
+      'refunded'
+    ),
+    defaultValue: 'pending'
+  },
+  subtotal: {
+    type: DataTypes.DECIMAL(10,2),
+    allowNull: true
+  },
+  shipping: {
+    type: DataTypes.DECIMAL(10,2),
+    allowNull: true
+  },
+  total: {
+    type: DataTypes.DECIMAL(10,2),
+    allowNull: true
+  },
+  address: {
+    type: DataTypes.JSON,
+    allowNull: true
+  },
+  adminNote: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  }
 }, {
-    tableName: 'orders',
-    timestamps: true,
-    createdAt: 'createdAt',
-    updatedAt: 'updatedAt',
-    // Validation supplémentaire pour vérifier que amount >= shipping
-    validate: {
-        amountGreaterThanShipping() {
-            if (parseFloat(this.amount) < parseFloat(this.shipping)) {
-                throw new Error('Le total (amount) doit être supérieur ou égal aux frais de livraison (shipping)');
-            }
-        }
-    }
+  tableName: 'orders',
+  timestamps: true
 });
 
 module.exports = Order;

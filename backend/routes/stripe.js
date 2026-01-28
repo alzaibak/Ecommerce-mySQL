@@ -1,65 +1,118 @@
+// routes/stripe.js - Updated to clean image URLs
 const router = require("express").Router();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const Product = require("../models/Product");
 
 const YOUR_DOMAIN = process.env.CLIENT_DOMAIN || 'http://localhost:8080';
+
+// Helper function to clean URLs
+const cleanImageUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+  
+  // Remove whitespace and newlines
+  let cleaned = url.trim();
+  
+  // Remove any trailing newlines or carriage returns
+  cleaned = cleaned.replace(/\r?\n|\r/g, '');
+  
+  // Validate URL format
+  try {
+    new URL(cleaned);
+    return cleaned;
+  } catch (error) {
+    console.warn('Invalid image URL:', url, '-> using placeholder');
+    return null;
+  }
+};
 
 // Create Checkout Session
 router.post('/create-checkout-session', async (req, res) => {
   try {
-    const { cartItems, total, email } = req.body;
+    const { cartItems, total, email, userId } = req.body;
 
     // Validate cart
     if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
       return res.status(400).json({ message: 'Cart is empty or invalid' });
     }
 
-    // Ensure domain is set
-    if (!YOUR_DOMAIN) {
-      return res.status(500).json({ message: 'CLIENT_DOMAIN is not defined in env' });
-    }
-
-    // Determine shipping cost (free if total > 100€)
+    // Determine shipping cost
     const shipping = total > 100 ? 0 : 9.99;
-    
-    // Calculate product total (sans les frais de livraison)
-    const productTotal = cartItems.reduce((sum, item) => {
-      const price = Number(item.price) || 0;
-      const quantity = Number(item.quantity) || 0;
-      return sum + (price * quantity);
-    }, 0);
-    
-    // Calculate grand total (product total + shipping)
-    const grandTotal = productTotal + shipping;
+    const grandTotal = total + shipping;
 
-    console.log("💰 Calculated amounts:", {
-      productTotal,
-      shipping,
-      grandTotal,
-      totalFromFrontend: total
-    });
+    console.log("💰 Processing cart items:", cartItems);
 
-    // Build Stripe line items for each product
-    const line_items = cartItems.map(item => {
-      const price = Number(item.price);
-      const quantity = Number(item.quantity);
+    // Build Stripe line items
+    const line_items = await Promise.all(cartItems.map(async (item) => {
+      const price = item.discountPrice && item.discountPrice < item.price 
+        ? item.discountPrice 
+        : item.price;
+      const quantity = Number(item.quantity) || 1;
 
       if (!price || price <= 0) throw new Error(`Invalid price for item ${item.title}`);
       if (!quantity || quantity <= 0) throw new Error(`Invalid quantity for item ${item.title}`);
+
+      // Build product name with attributes
+      const attributes = item.attributes || {};
+      const attributeText = Object.entries(attributes)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(', ');
+      
+      const productName = attributeText 
+        ? `${item.title} (${attributeText})`
+        : item.title;
+
+      // Check stock if product exists in database
+      if (item.id) {
+        const product = await Product.findByPk(item.id);
+        if (product && item.variantKey) {
+          const stock = product.getStock(attributes);
+          if (stock < quantity) {
+            throw new Error(`Insufficient stock for ${item.title}. Available: ${stock}`);
+          }
+        }
+      }
+
+      // Clean image URL
+      const images = [];
+      const cleanedImageUrl = cleanImageUrl(item.img);
+      if (cleanedImageUrl) {
+        images.push(cleanedImageUrl);
+      }
 
       return {
         price_data: {
           currency: 'EUR',
           product_data: {
-            name: item.title,
-            images: item.img ? [item.img] : [],
+            name: productName,
+            images: images.length > 0 ? images : [],
+            metadata: {
+              productId: item.id,
+              variantKey: item.variantKey || '',
+            }
           },
-          unit_amount: Math.round(price * 100), // convert to cents
+          unit_amount: Math.round(price * 100),
         },
         quantity,
       };
-    });
+    }));
 
-    // Use Stripe shipping options instead of adding shipping as line item
+    // Prepare products for metadata
+    const productsForMetadata = cartItems.map(item => ({
+      productId: item.id,
+      variantKey: item.variantKey || null,
+      title: item.title,
+      price: item.discountPrice && item.discountPrice < item.price ? item.discountPrice : item.price,
+      quantity: item.quantity,
+      img: cleanImageUrl(item.img) || null,
+      attributes: item.attributes || {}
+    }));
+
+    // Validate YOUR_DOMAIN
+    const domain = cleanImageUrl(YOUR_DOMAIN) || 'http://localhost:8080';
+    if (!domain.startsWith('http://') && !domain.startsWith('https://')) {
+      return res.status(400).json({ message: 'Invalid CLIENT_DOMAIN configuration' });
+    }
+
     const sessionParams = {
       payment_method_types: ['card'],
       mode: 'payment',
@@ -69,16 +122,17 @@ router.post('/create-checkout-session', async (req, res) => {
         allowed_countries: ['FR'] 
       },
       metadata: {
-        cart_ids: cartItems.map(i => i._id).join(','),
-        userId: Number(req.body.userId),
-        product_total: productTotal.toString(),
-        shipping_cost: shipping.toString()
+        cartItems: JSON.stringify(productsForMetadata),
+        userId: userId || 0,
+        product_total: total.toString(),
+        shipping_cost: shipping.toString(),
+        grand_total: grandTotal.toString()
       },
-      success_url: `${YOUR_DOMAIN}/successPayment?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${YOUR_DOMAIN}/cart`,
+      success_url: `${domain}/successPayment?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${domain}/cart`,
     };
 
-    // Add shipping options only if shipping cost > 0
+    // Add shipping options if needed
     if (shipping > 0) {
       sessionParams.shipping_options = [
         {
@@ -104,32 +158,24 @@ router.post('/create-checkout-session', async (req, res) => {
       ];
     }
 
-    // Create Stripe Checkout session
     const session = await stripe.checkout.sessions.create(sessionParams);
 
-    console.log("✅ Stripe session created:", {
-      sessionId: session.id,
-      amount_total: session.amount_total,
-      amount_subtotal: session.amount_subtotal,
-      shipping_options: session.shipping_options
-    });
-
-    // Send session URL to frontend
     res.json({ url: session.url });
 
   } catch (err) {
     console.error('Stripe session creation error:', err);
-    res.status(500).json({ message: err.message || 'Internal Server Error' });
+    res.status(500).json({ 
+      message: err.message.includes('stock') ? err.message : 'Internal Server Error' 
+    });
   }
 });
 
-// Retrieve Stripe Checkout session
+// Keep the retrieve session endpoint as is
 router.get("/checkout-session/:sessionId", async (req, res) => {
   try {
     const { sessionId } = req.params;
     if (!sessionId) return res.status(400).json({ message: "Session ID is required" });
 
-    // Retrieve session from Stripe
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ["line_items", "customer", "total_details"] 
     });

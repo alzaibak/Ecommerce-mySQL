@@ -1,3 +1,4 @@
+// ProfilePage.tsx - Updated interfaces and data handling
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ClientLayout from '@/components/client/ClientLayout';
@@ -5,69 +6,78 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ordersAPI, productsAPI } from '@/lib/api';
+import { ordersAPI } from '@/lib/api';
 import { 
   User, Package, LogOut, Mail, Loader2, ShoppingBag, Calendar,
   MapPin, CheckCircle, Clock, Truck, AlertCircle, Euro, Tag, Phone,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, Palette, Ruler
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/redux/hooks';
 import { logout } from '@/redux/userSlice';
+
+// Updated interfaces
+interface OrderItem {
+  id: number;
+  orderId: number;
+  productId: number;
+  variantKey?: string;
+  quantity: number;
+  price: number;
+  title: string;
+  img?: string;
+  attributes: Record<string, string>;
+  Product?: {
+    id: number;
+    title: string;
+    img?: string;
+    price: number;
+    discountPrice?: number;
+  };
+}
 
 interface Order {
   id: number;
   userId: number;
   orderNumber: string;
-  products: string[];
-  amount: number; // Total de la commande (produits + livraison) depuis la BD
-  shipping: number; // Frais de livraison depuis la BD
+  paymentIntentId: string;
+  status: 'pending' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+  subtotal: number;
+  shipping: number;
+  total: number;
   address: {
     name?: string;
     email?: string;
     phone?: string | null;
-    address?: string | {
-      city: string; line1: string; line2?: string; 
-      state: string; country: string; postal_code: string;
+    address?: {
+      city: string;
+      line1: string;
+      line2?: string;
+      state: string;
+      country: string;
+      postal_code: string;
     };
   };
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'livred' | 'delivered' | 'cancelled';
+  adminNote?: string;
   createdAt: string;
   updatedAt: string;
-}
-
-interface Product {
-  id: number;
-  title: string;
-  img?: string;
-  price: number;
-  description?: string;
-  category?: string;
-}
-
-interface OrderProduct {
-  product: Product;
-  quantity: number;
-}
-
-interface OrderWithDetails extends Order {
-  productDetails: OrderProduct[];
+  items: OrderItem[]; // Now using items instead of products
 }
 
 const statusConfig = {
   pending: { label: 'En attente', color: 'bg-yellow-500/10 text-yellow-600 border-yellow-200', icon: <Clock className="h-4 w-4" /> },
-  confirmed: { label: 'Confirmé', color: 'bg-green-500/10 text-green-600 border-green-200', icon: <CheckCircle className="h-4 w-4" /> },
+  paid: { label: 'Payé', color: 'bg-green-500/10 text-green-600 border-green-200', icon: <CheckCircle className="h-4 w-4" /> },
   processing: { label: 'En cours', color: 'bg-blue-500/10 text-blue-600 border-blue-200', icon: <Clock className="h-4 w-4" /> },
   shipped: { label: 'Expédié', color: 'bg-purple-500/10 text-purple-600 border-purple-200', icon: <Truck className="h-4 w-4" /> },
-  livred: { label: 'Livré', color: 'bg-green-500/10 text-green-600 border-green-200', icon: <CheckCircle className="h-4 w-4" /> },
   delivered: { label: 'Livré', color: 'bg-green-500/10 text-green-600 border-green-200', icon: <CheckCircle className="h-4 w-4" /> },
   cancelled: { label: 'Annulé', color: 'bg-red-500/10 text-red-600 border-red-200', icon: <AlertCircle className="h-4 w-4" /> },
+  refunded: { label: 'Remboursé', color: 'bg-gray-500/10 text-gray-600 border-gray-200', icon: <Euro className="h-4 w-4" /> },
 };
 
 const ProfilePage = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { currentUser } = useAppSelector((state) => state.user);
-  const [orders, setOrders] = useState<OrderWithDetails[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('orders');
   const [expandedOrders, setExpandedOrders] = useState<number[]>([]);
@@ -81,62 +91,26 @@ const ProfilePage = () => {
     const fetchData = async () => {
       try {
         const ordersData = await ordersAPI.getMyOrders();
-        console.log("Orders data from API:", ordersData);
         
-        const productsData = await productsAPI.getAll();
-        
-        const ordersWithDetails: OrderWithDetails[] = await Promise.all(
-          ordersData.map(async (order: Order) => {
-            const productDetails = await Promise.all(
-              order.products.map(async (productId) => {
-                try {
-                  const id = typeof productId === 'string' ? parseInt(productId, 10) : productId;
-                  let product = productsData.find((p: Product) => 
-                    p.id === id || p.id.toString() === productId.toString()
-                  );
-                  
-                  if (!product) {
-                    try {
-                      product = await productsAPI.getById(id);
-                    } catch (err) {
-                      console.warn(`Product ${productId} not found`);
-                    }
-                  }
-                  
-                  return {
-                    product: product || {
-                      id: id,
-                      title: `Produit #${productId}`,
-                      price: 0,
-                      description: 'Produit non disponible',
-                      img: undefined
-                    },
-                    quantity: 1
-                  };
-                } catch (error) {
-                  return {
-                    product: {
-                      id: typeof productId === 'string' ? parseInt(productId, 10) : productId,
-                      title: `Produit #${productId}`,
-                      price: 0,
-                      description: 'Erreur de chargement'
-                    },
-                    quantity: 1
-                  };
-                }
-              })
-            );
-            
-            // Utiliser directement les valeurs de la base de données
-            // Ne pas recalculer, juste s'assurer que ce sont des nombres
-            return { 
-              ...order, 
-              productDetails,
-              amount: typeof order.amount === 'string' ? parseFloat(order.amount) : order.amount,
-              shipping: typeof order.shipping === 'string' ? parseFloat(order.shipping) : order.shipping
-            };
-          })
-        );
+        // Map the data to our interface
+        const ordersWithDetails: Order[] = ordersData.map((order: any) => ({
+          ...order,
+          subtotal: typeof order.subtotal === 'string' ? parseFloat(order.subtotal) : order.subtotal,
+          shipping: typeof order.shipping === 'string' ? parseFloat(order.shipping) : order.shipping,
+          total: typeof order.total === 'string' ? parseFloat(order.total) : order.total,
+          // Ensure items array exists
+          items: Array.isArray(order.items) 
+            ? order.items.map((item: any) => ({
+                ...item,
+                price: typeof item.price === 'string' ? parseFloat(item.price) : item.price,
+                attributes: item.attributes || {},
+                // Use Product data if available
+                title: item.Product?.title || item.title,
+                img: item.Product?.img || item.img,
+                discountPrice: item.Product?.discountPrice
+              }))
+            : []
+        }));
 
         ordersWithDetails.sort((a, b) => 
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -180,34 +154,33 @@ const ProfilePage = () => {
   };
 
   const formatAddress = (address: Order['address']) => {
+    if (!address || !address.address) return 'Adresse non disponible';
+    
     if (typeof address.address === 'string') return address.address;
     
-    if (address.address && typeof address.address === 'object') {
-      const addr = address.address;
-      const lines = [];
-      if (addr.line1) lines.push(addr.line1);
-      if (addr.line2) lines.push(addr.line2);
-      if (addr.city || addr.state || addr.postal_code) {
-        const cityParts = [];
-        if (addr.city) cityParts.push(addr.city);
-        if (addr.state) cityParts.push(addr.state);
-        if (addr.postal_code) cityParts.push(addr.postal_code);
-        if (cityParts.length > 0) lines.push(cityParts.join(' '));
-      }
-      if (addr.country) lines.push(addr.country);
-      return lines.join(', ');
+    const addr = address.address;
+    const lines = [];
+    if (addr.line1) lines.push(addr.line1);
+    if (addr.line2) lines.push(addr.line2);
+    if (addr.city || addr.state || addr.postal_code) {
+      const cityParts = [];
+      if (addr.city) cityParts.push(addr.city);
+      if (addr.state) cityParts.push(addr.state);
+      if (addr.postal_code) cityParts.push(addr.postal_code);
+      if (cityParts.length > 0) lines.push(cityParts.join(' '));
     }
-    
-    return 'Adresse non disponible';
+    if (addr.country) lines.push(addr.country);
+    return lines.join(', ');
   };
 
   const handleProductClick = (productId: number) => {
     navigate(`/product/${productId}`);
   };
 
-  // Calculer le sous-total des produits en soustrayant les frais de livraison du total
-  const calculateSubtotalFromStoredValues = (amount: number, shipping: number) => {
-    return amount - shipping;
+  const getDisplayPrice = (item: OrderItem) => {
+    return item.Product?.discountPrice && item.Product.discountPrice < item.price
+      ? item.Product.discountPrice
+      : item.price;
   };
 
   if (!currentUser) return null;
@@ -252,7 +225,7 @@ const ProfilePage = () => {
                     </div>
                     <div className="text-center p-3 rounded-lg bg-green-500/5 border border-border/50">
                       <p className="text-xl font-bold text-foreground">
-                        {orders.reduce((sum, order) => sum + order.amount, 0).toFixed(2)}€
+                        {orders.reduce((sum, order) => sum + order.total, 0).toFixed(2)}€
                       </p>
                       <p className="text-xs text-muted-foreground">Total</p>
                     </div>
@@ -320,14 +293,9 @@ const ProfilePage = () => {
                         const status = statusConfig[order.status] || statusConfig.pending;
                         const isExpanded = expandedOrders.includes(order.id);
                         
-                        // Utiliser directement les valeurs stockées dans la base de données
-                        const shipping = order.shipping || 0;
-                        const total = order.amount;
-                        const subtotal = calculateSubtotalFromStoredValues(total, shipping);
-                        
                         return (
                           <Card key={order.id} className="card-shadow overflow-hidden hover:shadow-md transition-shadow border-border">
-                            {/* Header de la commande (toujours visible) */}
+                            {/* Order Header */}
                             <div 
                               className="p-4 cursor-pointer hover:bg-secondary/10 transition-colors border-b border-border/50"
                               onClick={() => toggleOrderExpand(order.id)}
@@ -348,10 +316,10 @@ const ProfilePage = () => {
                                 <div className="flex items-center gap-4">
                                   <div className="text-right">
                                     <p className="font-bold text-lg text-accent">
-                                      {total.toFixed(2)}€
+                                      {order.total.toFixed(2)}€
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                      {order.productDetails.length} article{order.productDetails.length > 1 ? 's' : ''}
+                                      {order.items.length} article{order.items.length > 1 ? 's' : ''}
                                     </p>
                                   </div>
                                   <Button 
@@ -369,78 +337,108 @@ const ProfilePage = () => {
                               </div>
                             </div>
 
-                            {/* Contenu détaillé (visible uniquement si expandé) */}
+                            {/* Expanded Order Details */}
                             {isExpanded && (
                               <CardContent className="pt-0 pb-4">
                                 <div className="space-y-4 mt-4">
-                                  {/* Liste des produits */}
+                                  {/* Order Items */}
                                   <div>
                                     <h4 className="font-semibold text-foreground mb-3">Articles commandés</h4>
                                     <div className="space-y-3">
-                                      {order.productDetails.map((item, idx) => (
-                                        <div
-                                          key={`${item.product.id}-${idx}`}
-                                          className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-3 rounded-lg bg-secondary/10 border border-border/50 hover:bg-secondary/20 transition-colors"
-                                        >
-                                          <div 
-                                            className="relative cursor-pointer flex-shrink-0 group"
-                                            onClick={() => handleProductClick(item.product.id)}
+                                      {order.items.map((item, idx) => {
+                                        const displayPrice = getDisplayPrice(item);
+                                        
+                                        return (
+                                          <div
+                                            key={`${item.id}-${idx}`}
+                                            className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-3 rounded-lg bg-secondary/10 border border-border/50 hover:bg-secondary/20 transition-colors"
                                           >
-                                            {item.product.img ? (
-                                              <img
-                                                src={item.product.img}
-                                                alt={item.product.title}
-                                                className="w-16 h-16 object-cover rounded-lg border border-border bg-background group-hover:opacity-90 group-hover:border-accent/50 transition-all"
-                                              />
-                                            ) : (
-                                              <div className="w-16 h-16 rounded-lg bg-accent/10 border border-border flex items-center justify-center group-hover:bg-accent/20 group-hover:border-accent/50 transition-colors">
-                                                <ShoppingBag className="h-8 w-8 text-accent/50 group-hover:text-accent/70" />
-                                              </div>
-                                            )}
-                                            <div className="absolute -top-2 -right-2 bg-accent text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-sm">
-                                              {item.quantity}
-                                            </div>
-                                          </div>
-                                          
-                                          <div className="flex-1 min-w-0">
-                                            <h4 
-                                              className="font-medium text-foreground mb-1 cursor-pointer hover:text-accent transition-colors group"
-                                              onClick={() => handleProductClick(item.product.id)}
+                                            <div 
+                                              className="relative cursor-pointer flex-shrink-0 group"
+                                              onClick={() => handleProductClick(item.productId)}
                                             >
-                                              {item.product.title}
-                                            </h4>
-                                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                                              {item.product.category && (
-                                                <Badge variant="outline" className="text-xs border-border">
-                                                  <Tag className="h-3 w-3 mr-1" />
-                                                  {item.product.category}
-                                                </Badge>
+                                              {item.img ? (
+                                                <img
+                                                  src={item.img}
+                                                  alt={item.title}
+                                                  className="w-16 h-16 object-cover rounded-lg border border-border bg-background group-hover:opacity-90 group-hover:border-accent/50 transition-all"
+                                                  onError={(e) => {
+                                                    e.currentTarget.src = 'https://via.placeholder.com/80x80?text=Produit';
+                                                  }}
+                                                />
+                                              ) : (
+                                                <div className="w-16 h-16 rounded-lg bg-accent/10 border border-border flex items-center justify-center group-hover:bg-accent/20 group-hover:border-accent/50 transition-colors">
+                                                  <ShoppingBag className="h-8 w-8 text-accent/50 group-hover:text-accent/70" />
+                                                </div>
                                               )}
-                                              <span className="text-sm text-muted-foreground">
-                                                Quantité: {item.quantity}
-                                              </span>
+                                              <div className="absolute -top-2 -right-2 bg-accent text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-sm">
+                                                {item.quantity}
+                                              </div>
                                             </div>
-                                            <p className="text-sm text-muted-foreground line-clamp-2">
-                                              {item.product.description || 'Description non disponible'}
-                                            </p>
+                                            
+                                            <div className="flex-1 min-w-0">
+                                              <h4 
+                                                className="font-medium text-foreground mb-1 cursor-pointer hover:text-accent transition-colors group"
+                                                onClick={() => handleProductClick(item.productId)}
+                                              >
+                                                {item.title}
+                                              </h4>
+                                              
+                                              {/* Display attributes */}
+                                              {item.attributes && Object.keys(item.attributes).length > 0 && (
+                                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                                  {Object.entries(item.attributes).map(([key, value]) => {
+                                                    let icon = null;
+                                                    let colorClass = 'border-border';
+                                                    
+                                                    if (key.toLowerCase() === 'size') {
+                                                      icon = <Ruler className="h-3 w-3 mr-1" />;
+                                                      colorClass = 'border-blue-200 text-blue-600';
+                                                    } else if (key.toLowerCase() === 'color') {
+                                                      icon = <Palette className="h-3 w-3 mr-1" />;
+                                                      colorClass = 'border-purple-200 text-purple-600';
+                                                    }
+                                                    
+                                                    return (
+                                                      <Badge key={key} variant="outline" className={`text-xs ${colorClass}`}>
+                                                        {icon}
+                                                        {value}
+                                                      </Badge>
+                                                    );
+                                                  })}
+                                                </div>
+                                              )}
+                                            </div>
+                                            
+                                            <div className="text-right">
+                                              <div className="flex flex-col items-end">
+                                                <p className="font-semibold text-foreground">
+                                                  {(displayPrice * item.quantity).toFixed(2)}€
+                                                </p>
+                                                {item.Product?.discountPrice && item.Product.discountPrice < item.price && (
+                                                  <>
+                                                    <span className="text-xs text-muted-foreground line-through">
+                                                      {(item.price * item.quantity).toFixed(2)}€
+                                                    </span>
+                                                    <Badge variant="outline" className="text-xs text-accent border-accent mt-1">
+                                                      Économisé: {((item.price - item.Product.discountPrice) * item.quantity).toFixed(2)}€
+                                                    </Badge>
+                                                  </>
+                                                )}
+                                                <p className="text-sm text-muted-foreground mt-1">
+                                                  {displayPrice.toFixed(2)}€ × {item.quantity}
+                                                </p>
+                                              </div>
+                                            </div>
                                           </div>
-                                          
-                                          <div className="text-right">
-                                            <p className="font-semibold text-foreground">
-                                              Prix actuel: {item.product.price.toFixed(2)}€
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                              (Prix au moment de la commande peut différer)
-                                            </p>
-                                          </div>
-                                        </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   </div>
 
-                                  {/* Adresse et résumé côte à côte */}
+                                  {/* Address and Summary */}
                                   <div className="grid md:grid-cols-2 gap-4">
-                                    {/* Adresse */}
+                                    {/* Address */}
                                     {order.address && (
                                       <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-200/30">
                                         <div className="flex items-start gap-3">
@@ -470,21 +468,21 @@ const ProfilePage = () => {
                                       </div>
                                     )}
 
-                                    {/* Résumé de la commande (utilisant les valeurs stockées) */}
+                                    {/* Order Summary */}
                                     <div className="p-4 rounded-lg bg-accent/5 border border-accent/20">
                                       <p className="text-sm font-medium text-foreground mb-3">Résumé de la commande</p>
                                       <div className="space-y-2 text-sm">
                                         <div className="flex justify-between">
                                           <span className="text-muted-foreground">Sous-total produits</span>
-                                          <span>{subtotal.toFixed(2)}€</span>
+                                          <span>{order.subtotal.toFixed(2)}€</span>
                                         </div>
                                         <div className="flex justify-between">
                                           <span className="text-muted-foreground">Frais de livraison</span>
-                                          <span>{shipping.toFixed(2)}€</span>
+                                          <span>{order.shipping.toFixed(2)}€</span>
                                         </div>
                                         <div className="border-t border-border pt-2 flex justify-between font-semibold text-lg">
                                           <span>Total payé</span>
-                                          <span className="text-accent">{total.toFixed(2)}€</span>
+                                          <span className="text-accent">{order.total.toFixed(2)}€</span>
                                         </div>
                                       </div>
                                     </div>
@@ -499,7 +497,7 @@ const ProfilePage = () => {
                   )}
                 </TabsContent>
 
-                {/* Info Tab */}
+                {/* Info Tab (unchanged) */}
                 <TabsContent value="info">
                   <Card className="card-shadow border-border">
                     <CardHeader className="bg-gradient-to-r from-accent/5 to-primary/5 border-b border-border">
